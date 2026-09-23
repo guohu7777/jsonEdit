@@ -270,8 +270,9 @@ async function uploadToApi(
   check: EndpointCheck,
 ): Promise<string> {
   // The check and the config must be one snapshot: a same-origin URL edit landing
-  // mid-flight must not send to the superseded path.
-  if (check.endpoint.href !== api.url) {
+  // mid-flight must not send to the superseded path. Compare canonical forms so a
+  // stored text like "https://host" matches its parsed "https://host/".
+  if (check.endpoint.href !== parseApiUrl(api.url).href) {
     throw new Error('上传地址已变更，请重试');
   }
   assertEndpointAllowed(api, check);

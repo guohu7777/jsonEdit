@@ -22,6 +22,7 @@ import {
   endpointConfirmed,
   inspectEndpoint,
   isApiConfigured,
+  parseApiUrl,
   uploadFile,
   uploadProviderLabel,
   type EndpointCheck,
@@ -149,7 +150,7 @@ ipcMain.handle(
         // The dialog was open for a while; a concurrent settings:set must not be
         // clobbered by the stale object captured above.
         const cur = getSettings();
-        if (cur.upload.api.url !== check.endpoint.href) {
+        if (parseApiUrl(cur.upload.api.url).href !== check.endpoint.href) {
           throw new Error('上传配置已变更，请重试');
         }
         cur.upload.api.allowPrivate = check.isPrivate;
