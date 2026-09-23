@@ -287,7 +287,7 @@ export default function App() {
               onChange={(v) => setProvider(v)}
               options={[
                 { value: 'api', label: '自定义 API（POST 文件，取响应里的 URL）' },
-                { value: 'auto', label: '自动（.env 配了 COS 走 COS，否则本地目录）' },
+                { value: 'auto', label: '自动（本地应用数据目录）' },
               ]}
             />
             {provider === 'api' && (

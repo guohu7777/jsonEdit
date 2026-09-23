@@ -9,7 +9,6 @@ import {
   type IpcMainInvokeEvent,
 } from 'electron';
 
-import { loadEnvFile } from './env';
 import {
   getSettings,
   mergeSettings,
@@ -27,8 +26,6 @@ import {
   uploadProviderLabel,
   type EndpointCheck,
 } from './upload';
-
-loadEnvFile();
 
 function createWindow(): void {
   const win = new BrowserWindow({

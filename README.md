@@ -31,7 +31,7 @@ npm run typecheck  # tsc -b --noEmit
 
 ## 上传配置
 
-上传目标按优先级生效：**自定义 API（界面配置）→ 腾讯云 COS（.env）→ 本地存储（回退）**。工具栏右上角显示当前生效的上传目标。
+上传目标按优先级生效：**自定义 API（界面配置）→ 本地存储（回退）**。工具栏右上角显示当前生效的上传目标。
 
 ### 自定义 API（界面配置）
 
@@ -39,25 +39,9 @@ npm run typecheck  # tsc -b --noEmit
 
 出于安全考虑，以下地址需要原生对话框确认后才允许使用：明文 `http://`，以及解析到内网/回环地址的域名（解析结果变化时会重新要求确认）。上传时会按确认过的地址集固定 DNS 结果发起请求。
 
-### 腾讯云 COS
+### 本地存储（默认）
 
-文件字段的上传由 Electron **主进程**完成（凭证不进入渲染进程）。复制 `.env.example` 为 `.env`：
-
-```env
-COS_SECRET_ID=xxx
-COS_SECRET_KEY=xxx
-COS_REGION=ap-guangzhou
-COS_BUCKET=your-bucket-1234567890
-# COS_PREFIX=json-editor        # 可选，对象键前缀
-# COS_PUBLIC_BASE=https://cdn.xxx.com  # 可选，CDN/自定义域名
-```
-
-`.env` 查找顺序（先命中先用）：
-
-1. 开发模式：项目根目录；打包后：程序可执行文件旁
-2. 应用数据目录（`userData`）下的 `.env`
-
-**未配置 COS 时自动回退本地存储**：文件复制到 `userData/uploads/` 并把 `file:///…` 路径写进 JSON，便于零配置试用。工具栏右上角会显示当前生效的上传目标（腾讯云 COS / 本地应用数据目录）。
+未配置自定义 API 时自动回退本地存储：文件复制到 `userData/uploads/` 并把 `file:///…` 路径写进 JSON，零配置即可试用。上传全程由 Electron **主进程**完成，接口凭证不进入渲染进程。
 
 ## 注释 Schema 约定
 
@@ -81,10 +65,10 @@ COS_BUCKET=your-bucket-1234567890
 
 ```
 electron/
-  main.ts      # Electron 主进程：窗口、IPC（upload:config / upload:file）
+  main.ts      # Electron 主进程：窗口、IPC（upload:config / upload:file / settings:set）
   preload.ts   # contextBridge 暴露 window.jsonEditor
-  upload.ts    # 上传 provider：腾讯云 COS / 本地 userData fallback
-  env.ts       # .env 解析
+  upload.ts    # 上传 provider：自定义 API / 本地 userData fallback（含 SSRF 防护）
+  settings.ts  # userData/settings.json 读写（Token 留在主进程）
 src/
   App.tsx      # 状态（data + schema）与全部编辑操作 ops
   schema.ts    # JsonValue/Schema 的纯函数操作（路径读写、类型推断/转换）
@@ -93,4 +77,4 @@ src/
 electron.vite.config.ts  # electron-vite 三端构建
 ```
 
-技术栈：Electron + electron-vite + React 19 + TypeScript + cos-nodejs-sdk-v5。
+技术栈：Electron + electron-vite + React 19 + TypeScript + Ant Design。
