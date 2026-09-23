@@ -75,33 +75,78 @@ export function isPrivateHost(hostname: string): boolean {
   return PRIVATE_IPV4.test(host);
 }
 
-/** Public-looking hostnames can still resolve to private addresses; check DNS too. */
-export async function resolvesToPrivate(hostname: string): Promise<boolean> {
-  try {
-    const addrs = await lookup(hostname, { all: true, verbatim: true });
-    return addrs.some((a) => isPrivateHost(a.address));
-  } catch {
-    return false; // unresolvable host; the upload itself will fail anyway
-  }
+export interface EndpointCheck {
+  endpoint: URL;
+  isHttp: boolean;
+  isPrivate: boolean;
+  /** The private addresses the endpoint currently resolves to (literal IP hosts included). */
+  privateAddrs: string[];
 }
 
-/** Throws unless the endpoint's risks were confirmed by the user when it was saved. */
+/** Resolves the endpoint and reports its risk profile; DNS is consulted, not just the hostname. */
+export async function inspectEndpoint(url: string): Promise<EndpointCheck> {
+  const endpoint = parseApiUrl(url);
+  const host = endpoint.hostname.replace(/^\[|\]$/g, '');
+  let privateAddrs: string[] = [];
+  try {
+    const addrs = await lookup(host, { all: true, verbatim: true });
+    privateAddrs = addrs.map((a) => a.address).filter(isPrivateHost);
+  } catch {
+    // unresolvable host; the upload itself will fail anyway
+  }
+  return {
+    endpoint,
+    isHttp: endpoint.protocol === 'http:',
+    isPrivate: isPrivateHost(host) || privateAddrs.length > 0,
+    privateAddrs,
+  };
+}
+
+/**
+ * True when the endpoint's current risk profile still matches what the user confirmed:
+ * http needs `allowHttp`, and a private-resolving endpoint needs `allowPrivate` plus a
+ * current private address set contained in the confirmed `privateAddrs` (a DNS change to
+ * different private targets requires fresh confirmation).
+ */
+export function endpointConfirmed(
+  api: { url: string; allowPrivate?: boolean; allowHttp?: boolean; privateAddrs?: string[] },
+  check: EndpointCheck,
+): boolean {
+  let origin: string | null = null;
+  try {
+    origin = new URL(api.url).origin;
+  } catch {
+    return true; // invalid stored URL; parseApiUrl will surface the error
+  }
+  if (check.endpoint.origin !== origin) return false;
+  if (check.isHttp && !api.allowHttp) return false;
+  if (
+    check.isPrivate &&
+    !(
+      api.allowPrivate &&
+      check.privateAddrs.every((a) => (api.privateAddrs ?? []).includes(a))
+    )
+  ) {
+    return false;
+  }
+  return true;
+}
+
+/** Throws unless the endpoint's risks were confirmed by the user. */
 export async function assertEndpointAllowed(api: {
   url: string;
   allowPrivate?: boolean;
   allowHttp?: boolean;
+  privateAddrs?: string[];
 }): Promise<URL> {
-  const endpoint = parseApiUrl(api.url);
-  if (endpoint.protocol === 'http:' && !api.allowHttp) {
+  const check = await inspectEndpoint(api.url);
+  if (check.isHttp && !api.allowHttp) {
     throw new Error('HTTP 明文上传地址未经确认，请在「上传设置」中重新保存');
   }
-  if (
-    !api.allowPrivate &&
-    (isPrivateHost(endpoint.hostname) || (await resolvesToPrivate(endpoint.hostname)))
-  ) {
+  if (!endpointConfirmed(api, check)) {
     throw new Error('上传地址指向内网/本机且未经确认，请在「上传设置」中重新保存');
   }
-  return endpoint;
+  return check.endpoint;
 }
 
 export function isApiConfigured(): boolean {

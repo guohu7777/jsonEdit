@@ -19,9 +19,9 @@ import {
 } from './settings';
 import {
   activeProvider,
-  isPrivateHost,
-  parseApiUrl,
-  resolvesToPrivate,
+  endpointConfirmed,
+  inspectEndpoint,
+  isApiConfigured,
   uploadFile,
   uploadProviderLabel,
 } from './upload';
@@ -67,7 +67,11 @@ function uploadConfig() {
 function trustedRenderer(event: IpcMainInvokeEvent): boolean {
   const frameUrl = event.senderFrame?.url ?? '';
   if (process.env.ELECTRON_RENDERER_URL) {
-    return frameUrl.startsWith(process.env.ELECTRON_RENDERER_URL);
+    try {
+      return new URL(frameUrl).origin === new URL(process.env.ELECTRON_RENDERER_URL).origin;
+    } catch {
+      return false;
+    }
   }
   const expected = pathToFileURL(join(import.meta.dirname, '../renderer/index.html')).href;
   return frameUrl === expected;
@@ -77,7 +81,7 @@ function trustedRenderer(event: IpcMainInvokeEvent): boolean {
 async function confirmEndpoint(
   win: BrowserWindow | null,
   url: URL,
-  risks: { isPrivate: boolean; isHttp: boolean },
+  risks: { isPrivate: boolean; isHttp: boolean; changed?: boolean },
 ): Promise<boolean> {
   const reasons = [
     ...(risks.isPrivate ? ['指向内网/本机地址'] : []),
@@ -89,21 +93,13 @@ async function confirmEndpoint(
     defaultId: 0,
     cancelId: 0,
     title: '确认上传地址',
-    message: `上传 API ${url.origin} ${reasons.join('、')}`,
+    message: `${risks.changed ? '上传地址的解析结果已变化 —— ' : ''}上传 API ${url.origin} ${reasons.join('、')}`,
     detail: '文件与 Token 会被发送到该地址。确认这是你自己的服务？',
   };
   const { response } = win
     ? await dialog.showMessageBox(win, options)
     : await dialog.showMessageBox(options);
   return response === 1;
-}
-
-function originOf(url: string): string | null {
-  try {
-    return new URL(url).origin;
-  } catch {
-    return null;
-  }
 }
 
 ipcMain.handle('upload:config', (event) => {
@@ -117,23 +113,19 @@ ipcMain.handle('settings:set', async (event, input: SettingsInput) => {
   const { provider, api } = next.upload;
   // The API URL only matters for the custom provider; in auto mode it is inert.
   if (provider === 'api' && api.url) {
-    const endpoint = parseApiUrl(api.url);
-    const isHttp = endpoint.protocol === 'http:';
-    const isPrivate =
-      isPrivateHost(endpoint.hostname) || (await resolvesToPrivate(endpoint.hostname));
+    const check = await inspectEndpoint(api.url);
+    // Only risky endpoints need consent, and an unchanged confirmed profile doesn't re-prompt.
     const prev = getSettings().upload.api;
-    const sameOrigin = endpoint.origin === originOf(prev.url ?? '');
-    const needsConfirm =
-      (isPrivate && !(sameOrigin && prev.allowPrivate)) ||
-      (isHttp && !(sameOrigin && prev.allowHttp));
-    if (needsConfirm) {
+    if ((check.isPrivate || check.isHttp) && !endpointConfirmed(prev, check)) {
       const win = BrowserWindow.fromWebContents(event.sender);
-      if (!(await confirmEndpoint(win, endpoint, { isPrivate, isHttp }))) {
+      const changed = Boolean(prev.privateAddrs?.length);
+      if (!(await confirmEndpoint(win, check.endpoint, { ...check, changed }))) {
         throw new Error('已取消：上传地址未经确认，未保存');
       }
     }
-    api.allowPrivate = isPrivate;
-    api.allowHttp = isHttp;
+    api.allowPrivate = check.isPrivate;
+    api.allowHttp = check.isHttp;
+    api.privateAddrs = check.privateAddrs;
   }
   saveSettings(next);
   return uploadConfig();
@@ -143,6 +135,23 @@ ipcMain.handle(
   'upload:file',
   async (event, payload: { name: string; mimeType: string; data: ArrayBuffer }) => {
     if (!trustedRenderer(event)) throw new Error('Untrusted sender');
+    if (isApiConfigured()) {
+      const settings = getSettings();
+      const api = settings.upload.api;
+      // DNS can change after the endpoint was confirmed; a new private target must be
+      // re-confirmed before files and the bearer token go out.
+      const check = await inspectEndpoint(api.url);
+      if (!endpointConfirmed(api, check)) {
+        const win = BrowserWindow.fromWebContents(event.sender);
+        if (!(await confirmEndpoint(win, check.endpoint, { ...check, changed: true }))) {
+          throw new Error('已取消：上传地址的解析结果变化，未经确认');
+        }
+        api.allowPrivate = check.isPrivate;
+        api.allowHttp = check.isHttp;
+        api.privateAddrs = check.privateAddrs;
+        saveSettings(settings);
+      }
+    }
     const buffer = Buffer.from(payload.data);
     return uploadFile(buffer, payload.name, payload.mimeType);
   },

@@ -10,6 +10,8 @@ export interface ApiUploadConfig {
   /** Set by the main process only, after the user confirmed the risk in a native dialog. */
   allowPrivate?: boolean;
   allowHttp?: boolean;
+  /** Private addresses the endpoint resolved to at confirmation time; DNS changes re-prompt. */
+  privateAddrs?: string[];
 }
 
 export interface Settings {
@@ -81,6 +83,9 @@ function normalize(raw: unknown): Settings {
         urlField: asString(api.urlField, 'url') || 'url',
         allowPrivate: api.allowPrivate === true,
         allowHttp: api.allowHttp === true,
+        privateAddrs: Array.isArray(api.privateAddrs)
+          ? api.privateAddrs.filter((a): a is string => typeof a === 'string')
+          : [],
       },
     },
   };
@@ -122,6 +127,7 @@ export function mergeSettings(input: SettingsInput): Settings {
   // Risk flags are derived from the user's native-dialog confirmation, never from renderer input.
   merged.upload.api.allowPrivate = false;
   merged.upload.api.allowHttp = false;
+  merged.upload.api.privateAddrs = [];
   return merged;
 }
 
