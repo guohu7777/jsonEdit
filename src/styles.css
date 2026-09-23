@@ -193,6 +193,32 @@ body {
   border: 1px solid var(--border);
 }
 
+.video-thumb {
+  position: relative;
+  display: inline-flex;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.video-thumb-badge {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 14px;
+  color: #fff;
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+}
+
+.video-modal-player {
+  width: 100%;
+  max-height: 70vh;
+  background: #000;
+}
+
 .field-error {
   font-size: 11px;
   max-width: 220px;
