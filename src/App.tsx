@@ -28,6 +28,7 @@ import {
 } from './schema';
 import { fetchUploadConfig, type UploadConfig } from './api';
 import { TreeNode } from './components/TreeNode';
+import { ResourceList } from './components/ResourceList';
 
 export interface Ops {
   setValue(path: Path, value: JsonValue): void;
@@ -40,13 +41,27 @@ export interface Ops {
 }
 
 const SAMPLE: JsonValue = {
-  title: '示例配置',
-  version: 1,
-  enabled: true,
-  homepage: 'https://example.com',
-  coverImage: '',
-  tags: ['编辑器', 'JSON'],
-  owner: { name: 'Hu', email: 'huc7605@gmail.com' },
+  resource: [
+    {
+      id: 'sj_s',
+      name: '时间案开始',
+      url: 'https://cdn1.cos.jufunny.com/static/game/zm/homeRoundImages/sj_s.png',
+      cache: true,
+      type: 'image',
+    },
+    {
+      id: 'jk_s1',
+      name: '监控视频1',
+      url: 'https://cdn1.cos.jufunny.com/image/2026-09-22/E6ECBB76E74F374E802940B8465BDA6A3E7A9E8AFC312530C9DBFFC31B488B50.mp4',
+      type: 'video',
+    },
+    {
+      id: 'bg',
+      name: '背景图',
+      url: 'https://cdn1.cos.jufunny.com/static/images/game/zm/player/bg.png',
+      type: 'image',
+    },
+  ],
 };
 
 function mergeSchema(value: JsonValue, old: SchemaNode | undefined): SchemaNode {
@@ -158,6 +173,29 @@ export default function App() {
 
   const preview = previewTab === 'json' ? data : schema;
 
+  const resourceItems =
+    data !== null &&
+    typeof data === 'object' &&
+    !Array.isArray(data) &&
+    Array.isArray((data as Record<string, JsonValue>).resource)
+      ? ((data as Record<string, JsonValue>).resource as JsonValue[])
+      : null;
+  const otherKeys = resourceItems
+    ? Object.keys(data as Record<string, JsonValue>).filter((k) => k !== 'resource')
+    : [];
+
+  const addResource = useCallback(() => {
+    setData((d) => {
+      const arr = resourceItems ?? [];
+      return setAtPath(d, ['resource', arr.length], {
+        id: '',
+        name: '',
+        url: '',
+        type: 'image',
+      });
+    });
+  }, [resourceItems]);
+
   return (
     <ConfigProvider
       locale={zhCN}
@@ -254,7 +292,32 @@ export default function App() {
 
         <main className="panes">
           <section className="tree-pane">
-            <TreeNode value={data} schema={schema} path={[]} depth={0} ops={ops} />
+            {resourceItems ? (
+              <>
+                <ResourceList
+                  items={resourceItems}
+                  itemSchema={schemaForPath(schema, ['resource'])?.item}
+                  path={['resource']}
+                  ops={ops}
+                  onAdd={addResource}
+                />
+                {otherKeys.map((k) => (
+                  <TreeNode
+                    key={k}
+                    name={k}
+                    value={(data as Record<string, JsonValue>)[k]}
+                    schema={schema.children?.[k]}
+                    path={[k]}
+                    depth={0}
+                    ops={ops}
+                    onRename={(n) => ops.renameKey([], k, n)}
+                    onDelete={() => ops.deleteNode([k])}
+                  />
+                ))}
+              </>
+            ) : (
+              <TreeNode value={data} schema={schema} path={[]} depth={0} ops={ops} />
+            )}
           </section>
           <section className="preview-pane">
             <Segmented

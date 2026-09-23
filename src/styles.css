@@ -207,3 +207,65 @@ body {
   border-left: 1px solid var(--border);
   margin-left: 9px;
 }
+
+/* ---- resource list mode ---- */
+
+.res-list {
+  padding: 2px 4px;
+}
+
+.res-row {
+  display: grid;
+  grid-template-columns: 110px 150px 88px minmax(220px, 1fr) 34px 22px 22px;
+  gap: 6px;
+  align-items: center;
+  padding: 5px 6px;
+  border-radius: 6px;
+}
+
+.res-item .res-row:hover {
+  background: var(--panel-2);
+}
+
+.res-header {
+  padding-top: 2px;
+  font-size: 11px;
+}
+
+.res-id,
+.res-type {
+  width: 100%;
+}
+
+.res-name {
+  width: 100%;
+}
+
+.mono {
+  font-family: 'JetBrains Mono', Menlo, Consolas, monospace;
+}
+
+.res-row .value-input.url {
+  min-width: 0;
+  flex: 1;
+}
+
+.res-row .file-editor {
+  display: flex;
+  min-width: 0;
+}
+
+.res-row .file-editor .ant-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.res-extra {
+  margin: 0 6px 4px 18px;
+  padding: 2px 6px;
+  border-left: 1px solid var(--border);
+}
+
+.res-add {
+  margin-top: 8px;
+}
