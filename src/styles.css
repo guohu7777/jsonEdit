@@ -269,3 +269,22 @@ body {
 .res-add {
   margin-top: 8px;
 }
+
+/* ---- upload settings modal ---- */
+
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 8px;
+}
+
+.settings-label {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 8px;
+}
+
+.settings-field {
+  width: 100%;
+}

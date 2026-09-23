@@ -2,7 +2,8 @@ import { join } from 'node:path';
 import { BrowserWindow, app, ipcMain, shell } from 'electron';
 
 import { loadEnvFile } from './env';
-import { isCosConfigured, uploadFile, uploadProviderLabel } from './upload';
+import { getSettings, saveSettings, type Settings } from './settings';
+import { activeProvider, uploadFile, uploadProviderLabel } from './upload';
 
 loadEnvFile();
 
@@ -34,9 +35,19 @@ function createWindow(): void {
 }
 
 ipcMain.handle('upload:config', () => ({
-  provider: isCosConfigured() ? 'cos' : 'local',
+  provider: activeProvider(),
   label: uploadProviderLabel(),
+  settings: getSettings(),
 }));
+
+ipcMain.handle('settings:set', (_event, settings: Settings) => {
+  saveSettings(settings);
+  return {
+    provider: activeProvider(),
+    label: uploadProviderLabel(),
+    settings: getSettings(),
+  };
+});
 
 ipcMain.handle(
   'upload:file',

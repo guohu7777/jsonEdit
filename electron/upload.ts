@@ -5,6 +5,8 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { app } from 'electron';
 
+import { getSettings } from './settings';
+
 type CosClient = {
   putObject: (
     params: {
@@ -35,8 +37,27 @@ export function isCosConfigured(): boolean {
   return Boolean(SecretId && SecretKey && Bucket && Region);
 }
 
+export type UploadProvider = 'api' | 'cos' | 'local';
+
+export function isApiConfigured(): boolean {
+  const s = getSettings();
+  return s.upload.provider === 'api' && Boolean(s.upload.api.url);
+}
+
+export function activeProvider(): UploadProvider {
+  if (isApiConfigured()) return 'api';
+  return isCosConfigured() ? 'cos' : 'local';
+}
+
 export function uploadProviderLabel(): string {
-  return isCosConfigured() ? '腾讯云 COS' : '本地应用数据目录';
+  switch (activeProvider()) {
+    case 'api':
+      return '自定义 API';
+    case 'cos':
+      return '腾讯云 COS';
+    default:
+      return '本地应用数据目录';
+  }
 }
 
 async function getCosClient(): Promise<CosClient> {
@@ -81,6 +102,38 @@ async function uploadLocal(data: Buffer, name: string): Promise<string> {
   return pathToFileURL(dest).href;
 }
 
+function resolveField(json: unknown, fieldPath: string): unknown {
+  let cur: unknown = json;
+  for (const seg of fieldPath.split('.').filter(Boolean)) {
+    if (cur === null || typeof cur !== 'object') return undefined;
+    cur = (cur as Record<string, unknown>)[seg];
+  }
+  return cur;
+}
+
+async function uploadToApi(data: Buffer, name: string, mimeType: string): Promise<string> {
+  const api = getSettings().upload.api;
+  const form = new FormData();
+  form.append(api.fileField || 'file', new Blob([new Uint8Array(data)], { type: mimeType }), name);
+  const res = await fetch(api.url, {
+    method: 'POST',
+    body: form,
+    headers: api.token ? { Authorization: `Bearer ${api.token}` } : undefined,
+  });
+  if (!res.ok) {
+    const body = (await res.text()).slice(0, 200);
+    throw new Error(`上传接口返回 ${res.status}: ${body}`);
+  }
+  const json: unknown = await res.json();
+  const field = api.urlField || 'url';
+  const url = resolveField(json, field);
+  if (typeof url !== 'string' || !url) {
+    throw new Error(`上传响应中未找到 URL 字段 '${field}'`);
+  }
+  return url;
+}
+
 export async function uploadFile(data: Buffer, name: string, mimeType: string): Promise<string> {
+  if (isApiConfigured()) return uploadToApi(data, name, mimeType);
   return isCosConfigured() ? uploadToCos(data, name, mimeType) : uploadLocal(data, name);
 }

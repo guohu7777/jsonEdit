@@ -1,9 +1,12 @@
+import type { Settings, UploadConfig } from './api';
+
 export {};
 
 declare global {
   interface Window {
     jsonEditor: {
-      getUploadConfig(): Promise<{ provider: 'cos' | 'local'; label: string }>;
+      getUploadConfig(): Promise<UploadConfig>;
+      setSettings(settings: Settings): Promise<UploadConfig>;
       uploadFile(file: {
         name: string;
         mimeType: string;
