@@ -35,6 +35,7 @@
   "build": {
     "appId": "app.jsoneditor",
     "productName": "JSON Editor",
+    "artifactName": "json-editor-${version}-${os}.${ext}",
     "directories": {
       "output": "release"
     },
