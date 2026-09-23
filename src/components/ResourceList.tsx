@@ -55,6 +55,13 @@ function ResourceItem({ item, itemSchema, itemPath, ops, onDelete }: ItemProps) 
         <ValueEditor
           type="file"
           value={field('url') ?? ''}
+          mediaHint={
+            field('type') === 'video'
+              ? 'video'
+              : field('type') === 'image'
+                ? 'image'
+                : undefined
+          }
           onChange={(v) => ops.setValue(fieldPath('url'), v)}
         />
         <Checkbox
