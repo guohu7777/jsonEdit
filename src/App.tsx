@@ -1,4 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Button, ConfigProvider, Segmented, Space, Tag, Typography, theme } from 'antd';
+import {
+  ClearOutlined,
+  CopyOutlined,
+  DownloadOutlined,
+  FileTextOutlined,
+  ImportOutlined,
+  UploadOutlined,
+} from '@ant-design/icons';
+import zhCN from 'antd/locale/zh_CN';
+import 'dayjs/locale/zh-cn';
 import type { FieldType, JsonValue, Path, SchemaNode } from './types';
 import {
   coerceValue,
@@ -148,85 +159,116 @@ export default function App() {
   const preview = previewTab === 'json' ? data : schema;
 
   return (
-    <div className="app">
-      <header className="toolbar">
-        <h1>JSON 可视化编辑器</h1>
-        <div className="actions">
-          <button onClick={() => jsonFileRef.current?.click()}>导入 JSON</button>
-          <button onClick={() => schemaFileRef.current?.click()}>导入注释 Schema</button>
-          <button onClick={() => download('data.json', JSON.stringify(data, null, 2))}>
-            导出 JSON
-          </button>
-          <button onClick={() => download('data.schema.json', JSON.stringify(schema, null, 2))}>
-            导出 Schema
-          </button>
-          <button onClick={() => navigator.clipboard.writeText(JSON.stringify(data, null, 2))}>
-            复制 JSON
-          </button>
-          <button
-            onClick={() => {
-              setData({});
-              setSchema({});
+    <ConfigProvider
+      locale={zhCN}
+      theme={{
+        algorithm: theme.darkAlgorithm,
+        token: {
+          colorPrimary: '#3b82f6',
+          borderRadius: 6,
+          fontFamily:
+            "-apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif",
+        },
+        components: {
+          Select: { optionSelectedBg: '#1e3a5f' },
+        },
+      }}
+    >
+      <div className="app">
+        <header className="toolbar">
+          <Typography.Title level={4} className="app-title">
+            JSON 可视化编辑器
+          </Typography.Title>
+          <Space size="small" wrap>
+            <Button icon={<ImportOutlined />} onClick={() => jsonFileRef.current?.click()}>
+              导入 JSON
+            </Button>
+            <Button icon={<FileTextOutlined />} onClick={() => schemaFileRef.current?.click()}>
+              导入注释 Schema
+            </Button>
+            <Button
+              icon={<DownloadOutlined />}
+              onClick={() => download('data.json', JSON.stringify(data, null, 2))}
+            >
+              导出 JSON
+            </Button>
+            <Button
+              icon={<DownloadOutlined />}
+              onClick={() => download('data.schema.json', JSON.stringify(schema, null, 2))}
+            >
+              导出 Schema
+            </Button>
+            <Button
+              icon={<CopyOutlined />}
+              onClick={() => navigator.clipboard.writeText(JSON.stringify(data, null, 2))}
+            >
+              复制 JSON
+            </Button>
+            <Button
+              danger
+              icon={<ClearOutlined />}
+              onClick={() => {
+                setData({});
+                setSchema({});
+              }}
+            >
+              清空
+            </Button>
+          </Space>
+          <Tag icon={<UploadOutlined />} color="blue" className="provider-tag">
+            上传 → {uploadCfg?.label ?? '…'}
+          </Tag>
+          <input
+            ref={jsonFileRef}
+            type="file"
+            accept=".json,application/json"
+            hidden
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) importJson(f);
+              e.target.value = '';
             }}
-          >
-            清空
-          </button>
-        </div>
-        <span className="provider">上传 → {uploadCfg?.label ?? '…'}</span>
-        <input
-          ref={jsonFileRef}
-          type="file"
-          accept=".json,application/json"
-          hidden
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) importJson(f);
-            e.target.value = '';
-          }}
-        />
-        <input
-          ref={schemaFileRef}
-          type="file"
-          accept=".json,application/json"
-          hidden
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) importSchema(f);
-            e.target.value = '';
-          }}
-        />
-      </header>
-
-      {error && <div className="error-banner">{error}</div>}
-
-      <main className="panes">
-        <section className="tree-pane">
-          <TreeNode
-            value={data}
-            schema={schema}
-            path={[]}
-            depth={0}
-            ops={ops}
           />
-        </section>
-        <section className="preview-pane">
-          <div className="preview-tabs">
-            <button
-              className={previewTab === 'json' ? 'active' : ''}
-              onClick={() => setPreviewTab('json')}
-            >
-              JSON
-            </button>
-            <button
-              className={previewTab === 'schema' ? 'active' : ''}
-              onClick={() => setPreviewTab('schema')}
-            >
-              Schema（类型 + 注释）
-            </button>
-          </div>
-          <pre className="preview">{JSON.stringify(preview, null, 2)}</pre>
-        </section>
-      </main>
-    </div>
+          <input
+            ref={schemaFileRef}
+            type="file"
+            accept=".json,application/json"
+            hidden
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) importSchema(f);
+              e.target.value = '';
+            }}
+          />
+        </header>
+
+        {error && (
+          <Alert
+            type="error"
+            message={error}
+            closable
+            onClose={() => setError(null)}
+            className="error-banner"
+          />
+        )}
+
+        <main className="panes">
+          <section className="tree-pane">
+            <TreeNode value={data} schema={schema} path={[]} depth={0} ops={ops} />
+          </section>
+          <section className="preview-pane">
+            <Segmented
+              value={previewTab}
+              onChange={(v) => setPreviewTab(v as 'json' | 'schema')}
+              options={[
+                { value: 'json', label: 'JSON' },
+                { value: 'schema', label: 'Schema（类型 + 注释）' },
+              ]}
+            />
+            <pre className="preview">{JSON.stringify(preview, null, 2)}</pre>
+          </section>
+        </main>
+      </div>
+    </ConfigProvider>
   );
 }
