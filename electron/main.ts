@@ -24,6 +24,7 @@ import {
   isApiConfigured,
   uploadFile,
   uploadProviderLabel,
+  type EndpointCheck,
 } from './upload';
 
 loadEnvFile();
@@ -135,12 +136,13 @@ ipcMain.handle(
   'upload:file',
   async (event, payload: { name: string; mimeType: string; data: ArrayBuffer }) => {
     if (!trustedRenderer(event)) throw new Error('Untrusted sender');
+    let check: EndpointCheck | undefined;
     if (isApiConfigured()) {
       const settings = getSettings();
       const api = settings.upload.api;
       // DNS can change after the endpoint was confirmed; a new private target must be
       // re-confirmed before files and the bearer token go out.
-      const check = await inspectEndpoint(api.url);
+      check = await inspectEndpoint(api.url);
       if (!endpointConfirmed(api, check)) {
         const win = BrowserWindow.fromWebContents(event.sender);
         if (!(await confirmEndpoint(win, check.endpoint, { ...check, changed: true }))) {
@@ -153,7 +155,7 @@ ipcMain.handle(
       }
     }
     const buffer = Buffer.from(payload.data);
-    return uploadFile(buffer, payload.name, payload.mimeType);
+    return uploadFile(buffer, payload.name, payload.mimeType, check);
   },
 );
 

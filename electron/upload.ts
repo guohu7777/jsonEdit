@@ -1,7 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { lookup } from 'node:dns/promises';
+import type { LookupAddress } from 'node:dns';
 import { mkdirSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
+import { request as httpRequest, type IncomingMessage } from 'node:http';
+import { request as httpsRequest } from 'node:https';
+import type { LookupFunction } from 'node:net';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { app } from 'electron';
@@ -79,7 +83,9 @@ export interface EndpointCheck {
   endpoint: URL;
   isHttp: boolean;
   isPrivate: boolean;
-  /** The private addresses the endpoint currently resolves to (literal IP hosts included). */
+  /** Every address the endpoint resolved to at check time; uploads connect only to these. */
+  addrs: LookupAddress[];
+  /** The private addresses among `addrs` (literal IP hosts included). */
   privateAddrs: string[];
 }
 
@@ -87,18 +93,30 @@ export interface EndpointCheck {
 export async function inspectEndpoint(url: string): Promise<EndpointCheck> {
   const endpoint = parseApiUrl(url);
   const host = endpoint.hostname.replace(/^\[|\]$/g, '');
-  let privateAddrs: string[] = [];
+  let addrs: LookupAddress[] = [];
   try {
-    const addrs = await lookup(host, { all: true, verbatim: true });
-    privateAddrs = addrs.map((a) => a.address).filter(isPrivateHost);
+    addrs = await lookup(host, { all: true, verbatim: true });
   } catch {
     // unresolvable host; the upload itself will fail anyway
   }
+  const privateAddrs = addrs.map((a) => a.address).filter(isPrivateHost);
   return {
     endpoint,
     isHttp: endpoint.protocol === 'http:',
     isPrivate: isPrivateHost(host) || privateAddrs.length > 0,
+    addrs,
     privateAddrs,
+  };
+}
+
+/** DNS rebinding defense: the upload connects only to the addresses just validated. */
+function pinnedLookup(addrs: LookupAddress[]): LookupFunction {
+  return (_hostname, options, callback) => {
+    if ('all' in options && options.all) {
+      callback(null, addrs);
+    } else {
+      callback(null, addrs[0].address, addrs[0].family);
+    }
   };
 }
 
@@ -133,20 +151,16 @@ export function endpointConfirmed(
 }
 
 /** Throws unless the endpoint's risks were confirmed by the user. */
-export async function assertEndpointAllowed(api: {
-  url: string;
-  allowPrivate?: boolean;
-  allowHttp?: boolean;
-  privateAddrs?: string[];
-}): Promise<URL> {
-  const check = await inspectEndpoint(api.url);
+export function assertEndpointAllowed(
+  api: { url: string; allowPrivate?: boolean; allowHttp?: boolean; privateAddrs?: string[] },
+  check: EndpointCheck,
+): void {
   if (check.isHttp && !api.allowHttp) {
     throw new Error('HTTP 明文上传地址未经确认，请在「上传设置」中重新保存');
   }
   if (!endpointConfirmed(api, check)) {
     throw new Error('上传地址指向内网/本机且未经确认，请在「上传设置」中重新保存');
   }
-  return check.endpoint;
 }
 
 export function isApiConfigured(): boolean {
@@ -221,26 +235,63 @@ function resolveField(json: unknown, fieldPath: string): unknown {
   return cur;
 }
 
-async function uploadToApi(data: Buffer, name: string, mimeType: string): Promise<string> {
-  const api = getSettings().upload.api;
-  const endpoint = await assertEndpointAllowed(api);
-  const form = new FormData();
-  form.append(api.fileField || 'file', new Blob([new Uint8Array(data)], { type: mimeType }), name);
-  const res = await fetch(endpoint, {
-    method: 'POST',
-    body: form,
-    headers: api.token ? { Authorization: `Bearer ${api.token}` } : undefined,
-    // A redirect would send the file and bearer token to an unvetted host.
-    redirect: 'manual',
+function readBody(res: IncomingMessage): Promise<Buffer> {
+  return new Promise((resolvePromise, reject) => {
+    const chunks: Buffer[] = [];
+    res.on('data', (c: Buffer) => chunks.push(c));
+    res.on('end', () => resolvePromise(Buffer.concat(chunks)));
+    res.on('error', reject);
   });
-  if (res.status >= 300 && res.status < 400) {
-    throw new Error(`上传接口返回重定向 ${res.status}，出于安全考虑不跟随`);
+}
+
+async function uploadToApi(
+  data: Buffer,
+  name: string,
+  mimeType: string,
+  check: EndpointCheck,
+): Promise<string> {
+  const api = getSettings().upload.api;
+  assertEndpointAllowed(api, check);
+  const { endpoint } = check;
+  const boundary = `----jsoneditor-${randomUUID()}`;
+  const fileField = api.fileField || 'file';
+  const fileName = name.replace(/["\\]/g, '_') || 'file';
+  const body = Buffer.concat([
+    Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="${fileField}"; filename="${fileName}"\r\nContent-Type: ${mimeType}\r\n\r\n`,
+    ),
+    data,
+    Buffer.from(`\r\n--${boundary}--\r\n`),
+  ]);
+  const doRequest = endpoint.protocol === 'https:' ? httpsRequest : httpRequest;
+  const res = await new Promise<IncomingMessage>((resolvePromise, reject) => {
+    const req = doRequest(
+      endpoint,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': `multipart/form-data; boundary=${boundary}`,
+          'Content-Length': body.length,
+          ...(api.token ? { Authorization: `Bearer ${api.token}` } : {}),
+        },
+        // Connect only to the addresses validated by `check`; a DNS change between
+        // now and connect time cannot redirect this request to another service.
+        ...(check.addrs.length > 0 ? { lookup: pinnedLookup(check.addrs) } : {}),
+      },
+      resolvePromise,
+    );
+    req.on('error', reject);
+    req.end(body);
+  });
+  const status = res.statusCode ?? 0;
+  const text = (await readBody(res)).toString('utf8');
+  if (status >= 300 && status < 400) {
+    throw new Error(`上传接口返回重定向 ${status}，出于安全考虑不跟随`);
   }
-  if (!res.ok) {
-    const body = (await res.text()).slice(0, 200);
-    throw new Error(`上传接口返回 ${res.status}: ${body}`);
+  if (status < 200 || status >= 300) {
+    throw new Error(`上传接口返回 ${status}: ${text.slice(0, 200)}`);
   }
-  const json: unknown = await res.json();
+  const json: unknown = JSON.parse(text);
   const field = api.urlField || 'url';
   const url = resolveField(json, field);
   if (typeof url !== 'string' || !url) {
@@ -249,7 +300,15 @@ async function uploadToApi(data: Buffer, name: string, mimeType: string): Promis
   return url;
 }
 
-export async function uploadFile(data: Buffer, name: string, mimeType: string): Promise<string> {
-  if (isApiConfigured()) return uploadToApi(data, name, mimeType);
+export async function uploadFile(
+  data: Buffer,
+  name: string,
+  mimeType: string,
+  check?: EndpointCheck,
+): Promise<string> {
+  if (isApiConfigured()) {
+    const api = getSettings().upload.api;
+    return uploadToApi(data, name, mimeType, check ?? (await inspectEndpoint(api.url)));
+  }
   return isCosConfigured() ? uploadToCos(data, name, mimeType) : uploadLocal(data, name);
 }
