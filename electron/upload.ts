@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { app } from 'electron';
 
-import { getSettings } from './settings';
+import { getSettings, type ApiUploadConfig } from './settings';
 
 type CosClient = {
   putObject: (
@@ -155,6 +155,9 @@ export function assertEndpointAllowed(
   api: { url: string; allowPrivate?: boolean; allowHttp?: boolean; privateAddrs?: string[] },
   check: EndpointCheck,
 ): void {
+  if (check.addrs.length === 0) {
+    throw new Error(`上传地址无法解析: ${check.endpoint.hostname}`);
+  }
   if (check.isHttp && !api.allowHttp) {
     throw new Error('HTTP 明文上传地址未经确认，请在「上传设置」中重新保存');
   }
@@ -235,30 +238,50 @@ function resolveField(json: unknown, fieldPath: string): unknown {
   return cur;
 }
 
+const MAX_RESPONSE_BYTES = 1024 * 1024;
+
 function readBody(res: IncomingMessage): Promise<Buffer> {
   return new Promise((resolvePromise, reject) => {
     const chunks: Buffer[] = [];
-    res.on('data', (c: Buffer) => chunks.push(c));
+    let size = 0;
+    res.on('data', (c: Buffer) => {
+      size += c.length;
+      if (size > MAX_RESPONSE_BYTES) {
+        res.destroy(new Error('上传响应超过 1MB 上限'));
+        return;
+      }
+      chunks.push(c);
+    });
     res.on('end', () => resolvePromise(Buffer.concat(chunks)));
     res.on('error', reject);
   });
+}
+
+/** Multipart header values must not carry CRLF, quotes, or control chars into the request. */
+function headerValue(value: string): string {
+  return value.replace(/[\r\n"\\\x00-\x1f\x7f]/g, '_');
 }
 
 async function uploadToApi(
   data: Buffer,
   name: string,
   mimeType: string,
+  api: ApiUploadConfig,
   check: EndpointCheck,
 ): Promise<string> {
-  const api = getSettings().upload.api;
+  // The check and the config must be one snapshot: a same-origin URL edit landing
+  // mid-flight must not send to the superseded path.
+  if (check.endpoint.href !== api.url) {
+    throw new Error('上传地址已变更，请重试');
+  }
   assertEndpointAllowed(api, check);
   const { endpoint } = check;
   const boundary = `----jsoneditor-${randomUUID()}`;
-  const fileField = api.fileField || 'file';
-  const fileName = name.replace(/["\\]/g, '_') || 'file';
+  const fileField = headerValue(api.fileField || 'file');
+  const fileName = headerValue(name) || 'file';
   const body = Buffer.concat([
     Buffer.from(
-      `--${boundary}\r\nContent-Disposition: form-data; name="${fileField}"; filename="${fileName}"\r\nContent-Type: ${mimeType}\r\n\r\n`,
+      `--${boundary}\r\nContent-Disposition: form-data; name="${fileField}"; filename="${fileName}"\r\nContent-Type: ${headerValue(mimeType)}\r\n\r\n`,
     ),
     data,
     Buffer.from(`\r\n--${boundary}--\r\n`),
@@ -308,7 +331,8 @@ export async function uploadFile(
 ): Promise<string> {
   if (isApiConfigured()) {
     const api = getSettings().upload.api;
-    return uploadToApi(data, name, mimeType, check ?? (await inspectEndpoint(api.url)));
+    const resolved = check ?? (await inspectEndpoint(api.url));
+    return uploadToApi(data, name, mimeType, api, resolved);
   }
   return isCosConfigured() ? uploadToCos(data, name, mimeType) : uploadLocal(data, name);
 }

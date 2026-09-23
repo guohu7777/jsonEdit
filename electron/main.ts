@@ -138,20 +138,24 @@ ipcMain.handle(
     if (!trustedRenderer(event)) throw new Error('Untrusted sender');
     let check: EndpointCheck | undefined;
     if (isApiConfigured()) {
-      const settings = getSettings();
-      const api = settings.upload.api;
       // DNS can change after the endpoint was confirmed; a new private target must be
       // re-confirmed before files and the bearer token go out.
-      check = await inspectEndpoint(api.url);
-      if (!endpointConfirmed(api, check)) {
+      check = await inspectEndpoint(getSettings().upload.api.url);
+      if (!endpointConfirmed(getSettings().upload.api, check)) {
         const win = BrowserWindow.fromWebContents(event.sender);
         if (!(await confirmEndpoint(win, check.endpoint, { ...check, changed: true }))) {
           throw new Error('已取消：上传地址的解析结果变化，未经确认');
         }
-        api.allowPrivate = check.isPrivate;
-        api.allowHttp = check.isHttp;
-        api.privateAddrs = check.privateAddrs;
-        saveSettings(settings);
+        // The dialog was open for a while; a concurrent settings:set must not be
+        // clobbered by the stale object captured above.
+        const cur = getSettings();
+        if (cur.upload.api.url !== check.endpoint.href) {
+          throw new Error('上传配置已变更，请重试');
+        }
+        cur.upload.api.allowPrivate = check.isPrivate;
+        cur.upload.api.allowHttp = check.isHttp;
+        cur.upload.api.privateAddrs = check.privateAddrs;
+        saveSettings(cur);
       }
     }
     const buffer = Buffer.from(payload.data);
