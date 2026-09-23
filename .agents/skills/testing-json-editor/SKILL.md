@@ -29,5 +29,5 @@ description: How to launch and end-to-end test the Electron visual JSON editor o
 
 ## Verifying without GUI tools
 - Clipboard: `xclip`/`xsel` may not be installed — `sudo apt-get install -y xclip` (passwordless sudo works). Then `xclip -selection clipboard -o`.
-- Upload fallback: with no COS_* env vars (and no .env in repo or userData), uploads write to `~/.config/json-editor/uploads/<uuid>-<safe-name>` and the field gets a `file://` URL — verify with `ls -lt` on that dir.
+- Upload fallback: with no custom API configured in settings (default), uploads write to `~/.config/json-editor/uploads/<uuid>-<safe-name>` and the field gets a `file://` URL — verify with `ls -lt` on that dir.
 - userData dir: `~/.config/json-editor/`.

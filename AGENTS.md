@@ -4,7 +4,7 @@
 
 ## 项目是什么
 
-跨平台 Electron 桌面应用：可视化 JSON 编辑器。树形 UI 编辑 JSON；每个字段可选类型；逐字段注释存在独立的 `SchemaNode` 树（导出为 `*.schema.json`）；「文件」类型字段经主进程上传（腾讯云 COS 或本地 fallback）后把 URL 写回 JSON。
+跨平台 Electron 桌面应用：可视化 JSON 编辑器。树形 UI 编辑 JSON；每个字段可选类型；逐字段注释存在独立的 `SchemaNode` 树（导出为 `*.schema.json`）；「文件」类型字段经主进程上传（GUI 配置的自定义 API 或本地 fallback）后把 URL 写回 JSON。
 
 ## 命令
 
@@ -23,10 +23,10 @@ npm run dist           # 产出安装包（AppImage/dmg/nsis，跨平台包需�
 
 | 位置 | 内容 |
 | --- | --- |
-| `electron/main.ts` | BrowserWindow、IPC handler（`upload:config`、`upload:file`）、`.env` 加载 |
+| `electron/main.ts` | BrowserWindow、IPC handler（`upload:config`、`upload:file`、`settings:set`）、上传端点风险确认对话框 |
 | `electron/preload.ts` | contextBridge 暴露 `window.jsonEditor`，渲染进程唯一的主进程入口 |
-| `electron/upload.ts` | 上传 provider 选择：COS 配置齐 → COS，否则本地 `userData/uploads`（返回 `file://` URL） |
-| `electron/env.ts` | 极简 .env 解析（不引 dotenv） |
+| `electron/upload.ts` | 上传 provider：自定义 API（multipart POST，含 SSRF 防护）或本地 `userData/uploads`（返回 `file://` URL） |
+| `electron/settings.ts` | `userData/settings.json` 读写、归一化；Token 只留主进程（`mergeSettings`/`toPublicSettings`） |
 | `src/App.tsx` | 全部状态（`data` + `schema`）与 `ops` 操作集（setValue/setType/setComment/setOptions/renameKey/deleteNode/addChild） |
 | `src/schema.ts` | 纯函数：`JsonValue`/`SchemaNode` 的路径读写、类型推断、值转换、唯一键名 |
 | `src/types.ts` | `JsonValue`、`FieldType`、`SchemaNode`、`Path` 定义 |
@@ -39,7 +39,7 @@ npm run dist           # 产出安装包（AppImage/dmg/nsis，跨平台包需�
 - **不可变更新**：任何 `data`/`schema` 修改走 `src/schema.ts` 的路径辅助函数（`setAtPath`、`updateSchemaAtPath` 等），返回新对象，不要原地 mutate。
 - **路径寻址**：`Path = (string|number)[]`；数组段是 number，对象段是 string。schema 中对象子节点在 `children[key]`，数组成员共享 `item`。
 - **类型切换**：一律走 `ops.setType` → `coerceValue` 转换值；不要在组件里自己转。
-- **主进程独占敏感面**：上传、读 `.env`、写文件都在 `electron/`；渲染进程只拿 IPC 结果。新 provider 加在 `upload.ts`，不要漏到 renderer。
+- **主进程独占敏感面**：上传、读写 `settings.json`、写文件都在 `electron/`；渲染进程只拿 IPC 结果。新 provider 加在 `upload.ts`，不要漏到 renderer。
 - **React**：函数组件 + hooks；UI 组件用 Ant Design 6（`ConfigProvider` + `darkAlgorithm` + zhCN，见 `App.tsx`），自定义布局样式在 `styles.css`（CSS 变量主题）。
 - **resource 模式**：根对象含 `resource` 数组时左栏渲染 `ResourceList`（每行 = id/名称/类型/URL 上传/缓存/删除）；缓存勾选遵循「存在即 true，取消勾选删键」的约定；其他顶层键仍走通用树。
 
@@ -48,14 +48,14 @@ npm run dist           # 产出安装包（AppImage/dmg/nsis，跨平台包需�
 - **ESM 主进程**：`"type": "module"`，electron-vite 产出 ESM main。用 `import.meta.dirname`，禁用 `__dirname`。
 - **preload 文件名**：构建产物是 `out/preload/preload.mjs`（不是 index.js）。ESM preload 要求 `sandbox: false`；改了 preload 输出名必须同步 `main.ts` 里的路径。
 - **产物目录名**：electron-vite 按入口文件名输出 `out/main/main.js`、`out/renderer/index.html`；`package.json` 的 `main` 字段要对应。
-- **COS SDK 是 CJS**：`electron/upload.ts` 里 `await import('cos-nodejs-sdk-v5')` 后取 `.default` 作为构造器；lazy import 是为了让本地-only 使用不加载 SDK。provider 判断以 `isCosConfigured()` 为准，新增 env 时同步改 `cosEnv()` 与 `.env.example`。
+- **上传 API 安全链**：`inspectEndpoint` 解析 DNS 判定内网/http 风险 → 需用户原生对话框确认（`allowPrivate`/`allowHttp`/`privateAddrs` 由主进程写入，renderer 输入不生效）→ 请求按确认地址 pinned lookup 发起、不跟随重定向。改端点校验时 `settings.ts` 归一化、`main.ts` 确认流程、`upload.ts` assert、`App.tsx` 表单四处要同步看。
 - **`webSecurity: false`**：本地 fallback 返回 `file://` URL，预览图片需要它；如要收紧请同步改预览逻辑。
 - **IPC 传 ArrayBuffer**：`upload:file` 的 payload 是 `{name, mimeType, data:ArrayBuffer}`，renderer 端先 `file.arrayBuffer()`；不要传 File/Blob 对象（structured clone 不支持）。
 - **数组项共享 schema**：`item` 只有一份，不要按索引存 schema；数组删除/重排不影响注释。
-- **不要提交**：`.env`、`uploads/`、`out/`、`release/`、`node_modules/`（已在 .gitignore）。`.env` 里可能有真实 COS 密钥，push 前确认没 track。
+- **不要提交**：`uploads/`、`out/`、`release/`、`node_modules/`（已在 .gitignore）。上传 Token 存 `userData/settings.json`，不进 git。
 
 ## 常用片段
 
 新增一个字段类型：在 `types.ts` 的 `FieldType`/`LEAF_TYPES`/`TYPE_LABELS` 加项 → `schema.ts` 补 `defaultValue`/`coerceValue`/`inferType` → `ValueEditor.tsx` 加输入控件分支。
 
-新增一个上传 provider：`upload.ts` 仿 `uploadToCos` 写 `uploadToX` → `isCosConfigured`/provider 选择处加分支 → `.env.example` 补变量 → README「上传配置」节补说明。
+新增一个上传 provider：`upload.ts` 仿 `uploadToApi`/`uploadLocal` 写 `uploadToX` → `isApiConfigured`/`activeProvider` 处加分支 → `settings.ts` 的 `Settings`/`DEFAULTS`/`normalize` 补配置项（如需 GUI 配置再改 `App.tsx` 设置表单）→ README「上传配置」节补说明。
