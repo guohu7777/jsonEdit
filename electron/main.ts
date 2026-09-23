@@ -1,9 +1,21 @@
 import { join } from 'node:path';
-import { BrowserWindow, app, ipcMain, shell } from 'electron';
+import { BrowserWindow, app, dialog, ipcMain, shell } from 'electron';
 
 import { loadEnvFile } from './env';
-import { getSettings, saveSettings, type Settings } from './settings';
-import { activeProvider, uploadFile, uploadProviderLabel } from './upload';
+import {
+  getSettings,
+  mergeSettings,
+  saveSettings,
+  toPublicSettings,
+  type SettingsInput,
+} from './settings';
+import {
+  activeProvider,
+  isPrivateHost,
+  parseApiUrl,
+  uploadFile,
+  uploadProviderLabel,
+} from './upload';
 
 loadEnvFile();
 
@@ -34,19 +46,56 @@ function createWindow(): void {
   }
 }
 
-ipcMain.handle('upload:config', () => ({
-  provider: activeProvider(),
-  label: uploadProviderLabel(),
-  settings: getSettings(),
-}));
-
-ipcMain.handle('settings:set', (_event, settings: Settings) => {
-  saveSettings(settings);
+function uploadConfig() {
   return {
     provider: activeProvider(),
     label: uploadProviderLabel(),
-    settings: getSettings(),
+    settings: toPublicSettings(getSettings()),
   };
+}
+
+/** Private-network endpoints are the SSRF-interesting ones, so a human must confirm them. */
+async function confirmPrivateEndpoint(win: BrowserWindow | null, url: URL): Promise<boolean> {
+  const options = {
+    type: 'warning' as const,
+    buttons: ['取消', '仍然保存'],
+    defaultId: 0,
+    cancelId: 0,
+    title: '确认上传地址',
+    message: `上传 API 指向内网/本机地址：${url.origin}`,
+    detail: '文件与 Token 会被发送到该地址。确认这是你自己的服务？',
+  };
+  const { response } = win
+    ? await dialog.showMessageBox(win, options)
+    : await dialog.showMessageBox(options);
+  return response === 1;
+}
+
+function originOf(url: string): string | null {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return null;
+  }
+}
+
+ipcMain.handle('upload:config', () => uploadConfig());
+
+ipcMain.handle('settings:set', async (event, input: SettingsInput) => {
+  const next = mergeSettings(input);
+  const { api } = next.upload;
+  if (api.url) {
+    const endpoint = parseApiUrl(api.url);
+    const known = originOf(getSettings().upload.api.url);
+    if (isPrivateHost(endpoint.hostname) && endpoint.origin !== known) {
+      const win = BrowserWindow.fromWebContents(event.sender);
+      if (!(await confirmPrivateEndpoint(win, endpoint))) {
+        throw new Error('已取消：上传地址指向内网/本机，未保存');
+      }
+    }
+  }
+  saveSettings(next);
+  return uploadConfig();
 });
 
 ipcMain.handle(

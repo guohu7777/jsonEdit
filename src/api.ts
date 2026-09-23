@@ -1,28 +1,40 @@
-export interface ApiUploadConfig {
-  url: string;
-  token?: string;
-  fileField?: string;
-  urlField?: string;
-}
-
-export interface Settings {
+/** What the main process exposes: the stored token stays there, only its presence is reported. */
+export interface PublicSettings {
   upload: {
     provider: 'auto' | 'api';
-    api: ApiUploadConfig;
+    api: {
+      url: string;
+      fileField: string;
+      urlField: string;
+      hasToken: boolean;
+    };
+  };
+}
+
+/** `token`: undefined keeps the stored one, null clears it, a string replaces it. */
+export interface SettingsInput {
+  upload: {
+    provider: 'auto' | 'api';
+    api: {
+      url: string;
+      fileField?: string;
+      urlField?: string;
+      token?: string | null;
+    };
   };
 }
 
 export interface UploadConfig {
   provider: 'api' | 'cos' | 'local';
   label: string;
-  settings: Settings;
+  settings: PublicSettings;
 }
 
 export async function fetchUploadConfig(): Promise<UploadConfig> {
   return window.jsonEditor.getUploadConfig();
 }
 
-export async function saveSettings(settings: Settings): Promise<UploadConfig> {
+export async function saveSettings(settings: SettingsInput): Promise<UploadConfig> {
   return window.jsonEditor.setSettings(settings);
 }
 

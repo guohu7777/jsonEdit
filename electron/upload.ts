@@ -39,6 +39,35 @@ export function isCosConfigured(): boolean {
 
 export type UploadProvider = 'api' | 'cos' | 'local';
 
+/** Only http(s) endpoints may be called from the main process. */
+export function parseApiUrl(url: string): URL {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error(`上传 API 地址无效: ${url}`);
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error(`上传 API 地址必须使用 http 或 https: ${url}`);
+  }
+  if (!parsed.hostname) throw new Error(`上传 API 地址缺少主机名: ${url}`);
+  return parsed;
+}
+
+const PRIVATE_IPV4 =
+  /^(10\.|127\.|0\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.)/;
+
+/** Loopback / link-local / RFC1918 targets are the SSRF-interesting ones and need explicit consent. */
+export function isPrivateHost(hostname: string): boolean {
+  const host = hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local')) return true;
+  if (host === '::1' || host.startsWith('fe80:') || host.startsWith('fc') || host.startsWith('fd')) {
+    return true;
+  }
+  if (host.startsWith('::ffff:')) return PRIVATE_IPV4.test(host.slice(7));
+  return PRIVATE_IPV4.test(host);
+}
+
 export function isApiConfigured(): boolean {
   const s = getSettings();
   return s.upload.provider === 'api' && Boolean(s.upload.api.url);
@@ -113,13 +142,19 @@ function resolveField(json: unknown, fieldPath: string): unknown {
 
 async function uploadToApi(data: Buffer, name: string, mimeType: string): Promise<string> {
   const api = getSettings().upload.api;
+  const endpoint = parseApiUrl(api.url);
   const form = new FormData();
   form.append(api.fileField || 'file', new Blob([new Uint8Array(data)], { type: mimeType }), name);
-  const res = await fetch(api.url, {
+  const res = await fetch(endpoint, {
     method: 'POST',
     body: form,
     headers: api.token ? { Authorization: `Bearer ${api.token}` } : undefined,
+    // A redirect would send the file and bearer token to an unvetted host.
+    redirect: 'manual',
   });
+  if (res.status >= 300 && res.status < 400) {
+    throw new Error(`上传接口返回重定向 ${res.status}，出于安全考虑不跟随`);
+  }
   if (!res.ok) {
     const body = (await res.text()).slice(0, 200);
     throw new Error(`上传接口返回 ${res.status}: ${body}`);

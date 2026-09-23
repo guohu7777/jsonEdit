@@ -1,16 +1,16 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
-import type { Settings } from './settings';
+import type { PublicSettings, SettingsInput } from './settings';
 
 export interface UploadConfigInfo {
   provider: 'api' | 'cos' | 'local';
   label: string;
-  settings: Settings;
+  settings: PublicSettings;
 }
 
 export interface JsonEditorApi {
   getUploadConfig(): Promise<UploadConfigInfo>;
-  setSettings(settings: Settings): Promise<UploadConfigInfo>;
+  setSettings(settings: SettingsInput): Promise<UploadConfigInfo>;
   uploadFile(file: { name: string; mimeType: string; data: ArrayBuffer }): Promise<string>;
 }
 

@@ -39,7 +39,7 @@ import {
   uniqueKey,
   updateSchemaAtPath,
 } from './schema';
-import { fetchUploadConfig, saveSettings, type Settings, type UploadConfig } from './api';
+import { fetchUploadConfig, saveSettings, type SettingsInput, type UploadConfig } from './api';
 import { TreeNode } from './components/TreeNode';
 import { ResourceList } from './components/ResourceList';
 
@@ -103,17 +103,22 @@ export default function App() {
   const [uploadCfg, setUploadCfg] = useState<UploadConfig | null>(null);
   const [previewTab, setPreviewTab] = useState<'json' | 'schema'>('json');
   const [error, setError] = useState<string | null>(null);
+  const [cfgLoading, setCfgLoading] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [provider, setProvider] = useState<'auto' | 'api'>('auto');
   const [apiUrl, setApiUrl] = useState('');
   const [apiToken, setApiToken] = useState('');
+  const [tokenEdited, setTokenEdited] = useState(false);
   const [apiFileField, setApiFileField] = useState('file');
   const [apiUrlField, setApiUrlField] = useState('url');
   const jsonFileRef = useRef<HTMLInputElement>(null);
   const schemaFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    fetchUploadConfig().then(setUploadCfg).catch(() => setUploadCfg(null));
+    fetchUploadConfig()
+      .then(setUploadCfg)
+      .catch((e) => setError(`读取上传设置失败: ${e instanceof Error ? e.message : e}`))
+      .finally(() => setCfgLoading(false));
   }, []);
 
   const ops: Ops = useMemo(
@@ -161,22 +166,25 @@ export default function App() {
   );
 
   const openSettings = useCallback(() => {
-    const s = uploadCfg?.settings;
-    setProvider(s?.upload.provider ?? 'auto');
-    setApiUrl(s?.upload.api.url ?? '');
-    setApiToken(s?.upload.api.token ?? '');
-    setApiFileField(s?.upload.api.fileField || 'file');
-    setApiUrlField(s?.upload.api.urlField || 'url');
+    if (!uploadCfg) return;
+    const s = uploadCfg.settings;
+    setProvider(s.upload.provider);
+    setApiUrl(s.upload.api.url);
+    setApiToken('');
+    setTokenEdited(false);
+    setApiFileField(s.upload.api.fileField || 'file');
+    setApiUrlField(s.upload.api.urlField || 'url');
     setSettingsOpen(true);
   }, [uploadCfg]);
 
   const saveSettingsModal = useCallback(() => {
-    const next: Settings = {
+    const token = tokenEdited ? (apiToken.trim() || null) : undefined;
+    const next: SettingsInput = {
       upload: {
         provider,
         api: {
           url: apiUrl.trim(),
-          token: apiToken.trim() || undefined,
+          token,
           fileField: apiFileField.trim() || 'file',
           urlField: apiUrlField.trim() || 'url',
         },
@@ -188,7 +196,7 @@ export default function App() {
         setSettingsOpen(false);
       })
       .catch((e) => setError(`保存设置失败: ${e instanceof Error ? e.message : e}`));
-  }, [provider, apiUrl, apiToken, apiFileField, apiUrlField]);
+  }, [provider, apiUrl, apiToken, tokenEdited, apiFileField, apiUrlField]);
 
   const importJson = useCallback((file: File) => {
     file
@@ -294,8 +302,14 @@ export default function App() {
                 <label className="settings-label">Token（可选，Bearer）</label>
                 <Input.Password
                   className="settings-field"
+                  placeholder={
+                    uploadCfg?.settings.upload.api.hasToken ? '已保存，留空不修改' : '未设置'
+                  }
                   value={apiToken}
-                  onChange={(e) => setApiToken(e.target.value)}
+                  onChange={(e) => {
+                    setApiToken(e.target.value);
+                    setTokenEdited(true);
+                  }}
                 />
                 <label className="settings-label">文件字段名</label>
                 <Input
@@ -360,6 +374,8 @@ export default function App() {
             type="text"
             icon={<SettingOutlined />}
             title="上传设置"
+            loading={cfgLoading}
+            disabled={!uploadCfg}
             onClick={openSettings}
           />
           <input
