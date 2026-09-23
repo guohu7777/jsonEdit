@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { lookup } from 'node:dns/promises';
 import { mkdirSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -61,11 +62,46 @@ const PRIVATE_IPV4 =
 export function isPrivateHost(hostname: string): boolean {
   const host = hostname.replace(/^\[|\]$/g, '').toLowerCase();
   if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local')) return true;
-  if (host === '::1' || host.startsWith('fe80:') || host.startsWith('fc') || host.startsWith('fd')) {
+  if (
+    host === '::' ||
+    host === '::1' ||
+    host.startsWith('fe80:') ||
+    host.startsWith('fc') ||
+    host.startsWith('fd')
+  ) {
     return true;
   }
   if (host.startsWith('::ffff:')) return PRIVATE_IPV4.test(host.slice(7));
   return PRIVATE_IPV4.test(host);
+}
+
+/** Public-looking hostnames can still resolve to private addresses; check DNS too. */
+export async function resolvesToPrivate(hostname: string): Promise<boolean> {
+  try {
+    const addrs = await lookup(hostname, { all: true, verbatim: true });
+    return addrs.some((a) => isPrivateHost(a.address));
+  } catch {
+    return false; // unresolvable host; the upload itself will fail anyway
+  }
+}
+
+/** Throws unless the endpoint's risks were confirmed by the user when it was saved. */
+export async function assertEndpointAllowed(api: {
+  url: string;
+  allowPrivate?: boolean;
+  allowHttp?: boolean;
+}): Promise<URL> {
+  const endpoint = parseApiUrl(api.url);
+  if (endpoint.protocol === 'http:' && !api.allowHttp) {
+    throw new Error('HTTP 明文上传地址未经确认，请在「上传设置」中重新保存');
+  }
+  if (
+    !api.allowPrivate &&
+    (isPrivateHost(endpoint.hostname) || (await resolvesToPrivate(endpoint.hostname)))
+  ) {
+    throw new Error('上传地址指向内网/本机且未经确认，请在「上传设置」中重新保存');
+  }
+  return endpoint;
 }
 
 export function isApiConfigured(): boolean {
@@ -142,7 +178,7 @@ function resolveField(json: unknown, fieldPath: string): unknown {
 
 async function uploadToApi(data: Buffer, name: string, mimeType: string): Promise<string> {
   const api = getSettings().upload.api;
-  const endpoint = parseApiUrl(api.url);
+  const endpoint = await assertEndpointAllowed(api);
   const form = new FormData();
   form.append(api.fileField || 'file', new Blob([new Uint8Array(data)], { type: mimeType }), name);
   const res = await fetch(endpoint, {

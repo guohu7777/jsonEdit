@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { app } from 'electron';
 
@@ -7,6 +7,9 @@ export interface ApiUploadConfig {
   token?: string;
   fileField?: string;
   urlField?: string;
+  /** Set by the main process only, after the user confirmed the risk in a native dialog. */
+  allowPrivate?: boolean;
+  allowHttp?: boolean;
 }
 
 export interface Settings {
@@ -76,6 +79,8 @@ function normalize(raw: unknown): Settings {
         token: asString(api.token, ''),
         fileField: asString(api.fileField, 'file') || 'file',
         urlField: asString(api.urlField, 'url') || 'url',
+        allowPrivate: api.allowPrivate === true,
+        allowHttp: api.allowHttp === true,
       },
     },
   };
@@ -113,12 +118,20 @@ export function mergeSettings(input: SettingsInput): Settings {
   const upload = asRecord(asRecord(input).upload);
   const api = asRecord(upload.api);
   const token = api.token === undefined ? (getSettings().upload.api.token ?? '') : api.token;
-  return normalize({ upload: { provider: upload.provider, api: { ...api, token } } });
+  const merged = normalize({ upload: { provider: upload.provider, api: { ...api, token } } });
+  // Risk flags are derived from the user's native-dialog confirmation, never from renderer input.
+  merged.upload.api.allowPrivate = false;
+  merged.upload.api.allowHttp = false;
+  return merged;
 }
 
 export function saveSettings(next: Settings): Settings {
   mkdirSync(app.getPath('userData'), { recursive: true });
-  writeFileSync(settingsPath(), JSON.stringify(next, null, 2));
+  // Write to a temp file then atomically rename, so a failed write can't truncate settings.json.
+  const target = settingsPath();
+  const tmp = `${target}.tmp`;
+  writeFileSync(tmp, JSON.stringify(next, null, 2));
+  renameSync(tmp, target);
   cache = next;
   return cache;
 }
