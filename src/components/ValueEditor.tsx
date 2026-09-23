@@ -1,4 +1,7 @@
 import { useRef, useState } from 'react';
+import { Button, Checkbox, ColorPicker, DatePicker, Input, InputNumber, Select, Typography } from 'antd';
+import { UploadOutlined } from '@ant-design/icons';
+import dayjs from 'dayjs';
 import type { FieldType, JsonValue } from '../types';
 import { uploadFile } from '../api';
 
@@ -31,15 +34,22 @@ function FileEditor({ value, onChange }: { value: JsonValue; onChange: (v: JsonV
 
   return (
     <span className="file-editor">
-      <input
+      <Input
+        size="small"
         className="value-input url"
         value={url}
         placeholder="上传后自动填入 URL"
         onChange={(e) => onChange(e.target.value)}
       />
-      <button className="upload-btn" disabled={busy} onClick={() => fileRef.current?.click()}>
-        {busy ? '上传中…' : '上传文件'}
-      </button>
+      <Button
+        size="small"
+        type="primary"
+        icon={<UploadOutlined />}
+        loading={busy}
+        onClick={() => fileRef.current?.click()}
+      >
+        上传文件
+      </Button>
       <input
         ref={fileRef}
         type="file"
@@ -51,7 +61,11 @@ function FileEditor({ value, onChange }: { value: JsonValue; onChange: (v: JsonV
         }}
       />
       {IMAGE_RE.test(url) && <img className="file-preview" src={url} alt="" />}
-      {error && <span className="field-error">{error}</span>}
+      {error && (
+        <Typography.Text type="danger" className="field-error">
+          {error}
+        </Typography.Text>
+      )}
     </span>
   );
 }
@@ -59,82 +73,61 @@ function FileEditor({ value, onChange }: { value: JsonValue; onChange: (v: JsonV
 export function ValueEditor({ type, value, options, onChange }: Props) {
   switch (type) {
     case 'boolean':
-      return (
-        <input
-          className="value-checkbox"
-          type="checkbox"
-          checked={value === true}
-          onChange={(e) => onChange(e.target.checked)}
-        />
-      );
+      return <Checkbox checked={value === true} onChange={(e) => onChange(e.target.checked)} />;
     case 'null':
-      return <span className="null-label">null</span>;
+      return <Typography.Text type="secondary" italic>null</Typography.Text>;
     case 'number':
       return (
-        <input
+        <InputNumber
+          size="small"
           className="value-input"
-          type="number"
           value={typeof value === 'number' ? value : 0}
-          onChange={(e) => {
-            const n = parseFloat(e.target.value);
-            onChange(Number.isFinite(n) ? n : 0);
-          }}
+          onChange={(n) => onChange(typeof n === 'number' ? n : 0)}
         />
       );
     case 'longtext':
       return (
-        <textarea
+        <Input.TextArea
           className="value-textarea"
           value={typeof value === 'string' ? value : ''}
           onChange={(e) => onChange(e.target.value)}
-          rows={3}
+          autoSize={{ minRows: 2, maxRows: 8 }}
         />
       );
     case 'date':
       return (
-        <input
-          className="value-input"
-          type="date"
-          value={typeof value === 'string' ? value.slice(0, 10) : ''}
-          onChange={(e) => onChange(e.target.value)}
+        <DatePicker
+          size="small"
+          value={typeof value === 'string' && value ? dayjs(value) : null}
+          onChange={(d) => onChange(d ? d.format('YYYY-MM-DD') : '')}
         />
       );
     case 'color':
       return (
-        <span className="color-editor">
-          <input
-            type="color"
-            value={typeof value === 'string' ? value : '#3b82f6'}
-            onChange={(e) => onChange(e.target.value)}
-          />
-          <input
-            className="value-input narrow"
-            value={typeof value === 'string' ? value : ''}
-            onChange={(e) => onChange(e.target.value)}
-          />
-        </span>
+        <ColorPicker
+          size="small"
+          showText
+          value={typeof value === 'string' ? value : '#3b82f6'}
+          onChange={(c) => onChange(c.toHexString())}
+        />
       );
     case 'select':
       return (
-        <select
+        <Select
+          size="small"
           className="value-input"
           value={typeof value === 'string' ? value : ''}
-          onChange={(e) => onChange(e.target.value)}
-        >
-          {(options ?? []).map((o) => (
-            <option key={o} value={o}>
-              {o}
-            </option>
-          ))}
-        </select>
+          options={(options ?? []).map((o) => ({ value: o, label: o }))}
+          onChange={(v) => onChange(v)}
+        />
       );
     case 'file':
       return <FileEditor value={value} onChange={onChange} />;
     case 'url':
       return (
-        <input
+        <Input
+          size="small"
           className="value-input url"
-          type="url"
           value={typeof value === 'string' ? value : ''}
           placeholder="https://…"
           onChange={(e) => onChange(e.target.value)}
@@ -142,7 +135,8 @@ export function ValueEditor({ type, value, options, onChange }: Props) {
       );
     default:
       return (
-        <input
+        <Input
+          size="small"
           className="value-input"
           value={typeof value === 'string' ? value : String(value ?? '')}
           onChange={(e) => onChange(e.target.value)}
