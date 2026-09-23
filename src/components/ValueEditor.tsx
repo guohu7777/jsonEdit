@@ -10,12 +10,12 @@ interface Props {
   value: JsonValue;
   options?: string[];
   onChange: (value: JsonValue) => void;
-  /** Declared media kind (e.g. resource type) — wins over URL-extension guesses. */
+  /** Declared media kind (e.g. resource type); when set it fully decides the preview kind. */
   mediaHint?: 'image' | 'video';
 }
 
-const IMAGE_RE = /\.(png|jpe?g|gif|webp|svg|avif|bmp)(\?.*)?$/i;
-const VIDEO_RE = /\.(mp4|webm|mov|mkv|avi|m4v|mpg|mpeg)(\?.*)?$/i;
+const IMAGE_RE = /\.(png|jpe?g|gif|webp|svg|avif|bmp)(?:[?#].*)?$/i;
+const VIDEO_RE = /\.(mp4|webm|mov|mkv|avi|m4v|mpg|mpeg)(?:[?#].*)?$/i;
 
 function FileEditor({
   value,
@@ -31,8 +31,8 @@ function FileEditor({
   const [error, setError] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const url = typeof value === 'string' ? value : '';
-  const isVideo = mediaHint === 'video' || VIDEO_RE.test(url);
-  const isImage = !isVideo && (mediaHint === 'image' || IMAGE_RE.test(url));
+  const isVideo = mediaHint === 'video' || (mediaHint === undefined && VIDEO_RE.test(url));
+  const isImage = mediaHint === 'image' || (mediaHint === undefined && IMAGE_RE.test(url));
 
   const pick = async (file: File) => {
     setBusy(true);
