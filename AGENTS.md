@@ -30,7 +30,7 @@ npm run dist           # 产出安装包（AppImage/dmg/nsis，跨平台包需�
 | `src/App.tsx` | 全部状态（`data` + `schema`）与 `ops` 操作集（setValue/setType/setComment/setOptions/renameKey/deleteNode/addChild） |
 | `src/schema.ts` | 纯函数：`JsonValue`/`SchemaNode` 的路径读写、类型推断、值转换、唯一键名 |
 | `src/types.ts` | `JsonValue`、`FieldType`、`SchemaNode`、`Path` 定义 |
-| `src/components/` | `TreeNode`（递归行）、`ValueEditor`（按类型分发输入控件，含文件上传） |
+| `src/components/` | `ResourceList`（`resource` 数组的表格式行编辑器）、`TreeNode`（递归行）、`ValueEditor`（按类型分发输入控件，含文件上传） |
 | `src/api.ts` + `src/global.d.ts` | 渲染进程调用 `window.jsonEditor.*` 的封装与类型声明 |
 
 ## 硬性约定
@@ -40,7 +40,8 @@ npm run dist           # 产出安装包（AppImage/dmg/nsis，跨平台包需�
 - **路径寻址**：`Path = (string|number)[]`；数组段是 number，对象段是 string。schema 中对象子节点在 `children[key]`，数组成员共享 `item`。
 - **类型切换**：一律走 `ops.setType` → `coerceValue` 转换值；不要在组件里自己转。
 - **主进程独占敏感面**：上传、读 `.env`、写文件都在 `electron/`；渲染进程只拿 IPC 结果。新 provider 加在 `upload.ts`，不要漏到 renderer。
-- **React**：函数组件 + hooks；样式全在 `styles.css`（CSS 变量主题），不引 UI 库。
+- **React**：函数组件 + hooks；UI 组件用 Ant Design 6（`ConfigProvider` + `darkAlgorithm` + zhCN，见 `App.tsx`），自定义布局样式在 `styles.css`（CSS 变量主题）。
+- **resource 模式**：根对象含 `resource` 数组时左栏渲染 `ResourceList`（每行 = id/名称/类型/URL 上传/缓存/删除）；缓存勾选遵循「存在即 true，取消勾选删键」的约定；其他顶层键仍走通用树。
 
 ## 易踩的坑（改之前先看）
 
