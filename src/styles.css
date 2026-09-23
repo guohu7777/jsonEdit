@@ -1,0 +1,365 @@
+:root {
+  --bg: #0f1420;
+  --panel: #161c2c;
+  --panel-2: #1c2338;
+  --border: #2a3450;
+  --text: #e6eaf2;
+  --muted: #8b95ad;
+  --accent: #3b82f6;
+  --accent-dim: #23407a;
+  --danger: #ef4444;
+  --comment: #f0b429;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family:
+    'Inter', 'PingFang SC', 'Microsoft YaHei', system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  flex-wrap: wrap;
+}
+
+.toolbar h1 {
+  font-size: 15px;
+  margin: 0;
+  font-weight: 600;
+}
+
+.toolbar .actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.toolbar button {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.toolbar button:hover {
+  border-color: var(--accent);
+}
+
+.provider {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.error-banner {
+  background: #4c1d24;
+  color: #ffb4b4;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--danger);
+}
+
+.panes {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.tree-pane {
+  flex: 1.4;
+  overflow: auto;
+  padding: 8px 4px;
+  border-right: 1px solid var(--border);
+}
+
+.preview-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--panel);
+}
+
+.preview-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.preview-tabs button {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--muted);
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.preview-tabs button.active {
+  color: var(--text);
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.preview {
+  flex: 1;
+  overflow: auto;
+  margin: 0;
+  padding: 12px;
+  font-family: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre;
+}
+
+.node-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 0;
+  border-radius: 6px;
+  min-width: max-content;
+}
+
+.node-row:hover {
+  background: var(--panel-2);
+}
+
+.caret,
+.caret-placeholder {
+  width: 20px;
+  flex: none;
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px;
+}
+
+.node-name {
+  min-width: 90px;
+  font-family: 'JetBrains Mono', Menlo, Consolas, monospace;
+  color: #7dd3fc;
+  flex: none;
+}
+
+.node-name.root {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.node-name.index {
+  color: var(--muted);
+}
+
+.node-name.editable {
+  background: transparent;
+  border: 1px dashed transparent;
+  border-radius: 4px;
+  padding: 2px 4px;
+  font-size: 13px;
+}
+
+.node-name.editable:hover,
+.node-name.editable:focus {
+  border-color: var(--border);
+  background: var(--panel-2);
+  outline: none;
+}
+
+.size-badge {
+  color: var(--muted);
+  font-size: 11px;
+  flex: none;
+}
+
+.type-select {
+  background: var(--accent-dim);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 4px;
+  font-size: 11px;
+  flex: none;
+}
+
+.value-input,
+.value-textarea {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  padding: 4px 8px;
+  font-family: 'JetBrains Mono', Menlo, Consolas, monospace;
+  font-size: 12px;
+  min-width: 160px;
+}
+
+.value-input.url {
+  min-width: 240px;
+}
+
+.value-input.narrow {
+  min-width: 80px;
+  width: 90px;
+}
+
+.value-textarea {
+  width: 320px;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.value-input:focus,
+.value-textarea:focus,
+.type-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.options-input {
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: 4px;
+  color: var(--muted);
+  padding: 3px 6px;
+  font-size: 11px;
+  width: 150px;
+}
+
+.icon-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  flex: none;
+}
+
+.icon-btn:hover {
+  background: var(--border);
+  color: var(--text);
+}
+
+.icon-btn.danger:hover {
+  color: var(--danger);
+}
+
+.comment-btn.has-comment {
+  color: var(--comment);
+}
+
+.comment-text {
+  color: var(--comment);
+  font-size: 12px;
+  font-style: italic;
+  padding: 0 8px 3px 0;
+  opacity: 0.85;
+}
+
+.comment-text::before {
+  content: '// ';
+  opacity: 0.6;
+}
+
+.comment-editor input {
+  background: var(--panel-2);
+  border: 1px solid var(--comment);
+  border-radius: 4px;
+  color: var(--comment);
+  padding: 4px 8px;
+  font-size: 12px;
+  font-style: italic;
+  width: 320px;
+  margin: 2px 0;
+}
+
+.file-editor {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.upload-btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  flex: none;
+}
+
+.upload-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.file-preview {
+  height: 28px;
+  max-width: 60px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+.field-error {
+  color: var(--danger);
+  font-size: 11px;
+  max-width: 200px;
+}
+
+.null-label {
+  color: var(--muted);
+  font-family: 'JetBrains Mono', monospace;
+  font-style: italic;
+}
+
+.color-editor {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.value-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
+.empty-hint {
+  color: var(--muted);
+  font-style: italic;
+  padding: 3px 8px;
+}
+
+.children {
+  border-left: 1px solid var(--border);
+  margin-left: 9px;
+}
