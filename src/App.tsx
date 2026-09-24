@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ActionIcon,
   Alert,
@@ -147,10 +147,16 @@ export default function App() {
     void setTheme(colorScheme === 'auto' ? 'system' : colorScheme).catch(() => {});
   }, [colorScheme]);
 
-  // Restore the last editing session on next launch. Debounced during editing;
-  // flushed synchronously on pagehide so a close right after an edit is not lost.
+  // Restore the last editing session on next launch. A layout-effect-updated ref
+  // keeps the latest committed workspace reachable from the stable pagehide
+  // handler — a passive-effect closure could otherwise save pre-commit values
+  // if the window closes before the effect re-runs. Debounced during editing.
+  const wsRef = useRef({ data, schema, previewTab });
+  useLayoutEffect(() => {
+    wsRef.current = { data, schema, previewTab };
+  }, [data, schema, previewTab]);
   useEffect(() => {
-    const save = () => setPersistFailed(!saveWorkspace({ data, schema, previewTab }));
+    const save = () => setPersistFailed(!saveWorkspace(wsRef.current));
     const t = setTimeout(save, 300);
     window.addEventListener('pagehide', save);
     return () => {
