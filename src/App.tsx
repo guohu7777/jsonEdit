@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ActionIcon,
   Alert,
@@ -54,6 +54,7 @@ import {
 } from './api';
 import { TreeNode } from './components/TreeNode';
 import { ResourceList } from './components/ResourceList';
+import { loadWorkspace, saveWorkspace } from './workspace';
 
 export interface Ops {
   setValue(path: Path, value: JsonValue): void;
@@ -110,11 +111,16 @@ function mergeSchema(value: JsonValue, old: SchemaNode | undefined): SchemaNode 
 }
 
 export default function App() {
-  const [data, setData] = useState<JsonValue>(SAMPLE);
-  const [schema, setSchema] = useState<SchemaNode>(() => inferSchema(SAMPLE));
+  const restored = useMemo(loadWorkspace, []);
+  const [data, setData] = useState<JsonValue>(() => (restored ? restored.data : SAMPLE));
+  const [schema, setSchema] = useState<SchemaNode>(() => {
+    if (!restored) return inferSchema(SAMPLE);
+    return Object.keys(restored.schema).length ? restored.schema : inferSchema(restored.data);
+  });
   const [uploadCfg, setUploadCfg] = useState<UploadConfig | null>(null);
-  const [previewTab, setPreviewTab] = useState<'json' | 'schema'>('json');
+  const [previewTab, setPreviewTab] = useState<'json' | 'schema'>(restored?.previewTab ?? 'json');
   const [error, setError] = useState<string | null>(null);
+  const [persistFailed, setPersistFailed] = useState(false);
   const [cfgLoading, setCfgLoading] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [apiUrl, setApiUrl] = useState('');
@@ -140,6 +146,24 @@ export default function App() {
   useEffect(() => {
     void setTheme(colorScheme === 'auto' ? 'system' : colorScheme).catch(() => {});
   }, [colorScheme]);
+
+  // Restore the last editing session on next launch. A layout-effect-updated ref
+  // keeps the latest committed workspace reachable from the stable pagehide
+  // handler — a passive-effect closure could otherwise save pre-commit values
+  // if the window closes before the effect re-runs. Debounced during editing.
+  const wsRef = useRef({ data, schema, previewTab });
+  useLayoutEffect(() => {
+    wsRef.current = { data, schema, previewTab };
+  }, [data, schema, previewTab]);
+  useEffect(() => {
+    const save = () => setPersistFailed(!saveWorkspace(wsRef.current));
+    const t = setTimeout(save, 300);
+    window.addEventListener('pagehide', save);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener('pagehide', save);
+    };
+  }, [data, schema, previewTab]);
 
   const toggleTheme = useCallback(() => {
     setColorScheme(computedScheme === 'dark' ? 'light' : 'dark');
@@ -440,6 +464,15 @@ export default function App() {
         >
           上传 → {uploadCfg?.label ?? '…'}
         </Badge>
+        {persistFailed && (
+          <Badge
+            variant="light"
+            color="yellow"
+            title="文档过大或存储不可用，本次编辑在重开后不会恢复"
+          >
+            未保存
+          </Badge>
+        )}
         <ActionIcon
           variant="subtle"
           size="lg"

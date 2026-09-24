@@ -34,6 +34,7 @@ npm run dist           # 产出安装包（AppImage/dmg/nsis，跨平台包需�
 | `src/types.ts` | `JsonValue`、`FieldType`、`SchemaNode`、`Path` 定义 |
 | `src/components/` | `ResourceList`（`resource` 数组的表格式行编辑器）、`TreeNode`（递归行）、`ValueEditor`（按类型分发输入控件，含文件上传） |
 | `src/api.ts` + `src/global.d.ts` | 渲染进程调用 `window.jsonEditor.*` 的封装与类型声明 |
+| `src/workspace.ts` | localStorage 工作区持久化：`data`+`schema`+`previewTab`，启动时恢复上次编辑状态 |
 
 ## 硬性约定
 
