@@ -49,17 +49,11 @@ macOS 版未做 Apple 签名/公证，Gatekeeper 会拦截首次打开。把 dmg
 
 ## 上传配置
 
-上传目标按优先级生效：**自定义 API（界面配置）→ 本地存储（回退）**。工具栏右上角显示当前生效的上传目标。
+「文件」类型字段需先配置上传 API 才能上传（未配置时上传按钮禁用）。工具栏右上角徽章显示当前上传状态。
 
-### 自定义 API（界面配置）
+点击工具栏 ⚙️ 打开上传设置，填写接口地址、可选的 Bearer Token、表单字段名、响应中的 URL 字段名（支持 `data.url` 这类点路径），以及自定义 Query 参数（键值对，拼到上传地址 `?` 后面，如 `bucket=imgs`），保存后生效；留空 API 地址即为不上传。设置持久化在 `userData/settings.json`；Token 仅留在主进程，界面不回显，留空表示不修改，清空表示删除。
 
-点击工具栏 ⚙️ 打开上传设置，填写接口地址、可选的 Bearer Token、表单字段名、响应中的 URL 字段名（支持 `data.url` 这类点路径），以及自定义 Query 参数（键值对，拼到上传地址 `?` 后面，如 `bucket=imgs`），保存后即作为首选上传方式。设置持久化在 `userData/settings.json`；Token 仅留在主进程，界面不回显，留空表示不修改，清空表示删除。
-
-出于安全考虑，以下地址需要原生对话框确认后才允许使用：明文 `http://`，以及解析到内网/回环地址的域名（解析结果变化时会重新要求确认）。上传时会按确认过的地址集固定 DNS 结果发起请求。
-
-### 本地存储（默认）
-
-未配置自定义 API 时自动回退本地存储：文件复制到 `userData/uploads/` 并把 `file:///…` 路径写进 JSON，零配置即可试用。上传全程由 Electron **主进程**完成，接口凭证不进入渲染进程。
+出于安全考虑，以下地址需要原生对话框确认后才允许使用：明文 `http://`，以及解析到内网/回环地址的域名（解析结果变化时会重新要求确认）。上传时会按确认过的地址集固定 DNS 结果发起请求，且上传全程由 Electron **主进程**完成，接口凭证不进入渲染进程。
 
 ## 注释 Schema 约定
 
@@ -85,7 +79,7 @@ macOS 版未做 Apple 签名/公证，Gatekeeper 会拦截首次打开。把 dmg
 electron/
   main.ts      # Electron 主进程：窗口、IPC（upload:config / upload:file / settings:set）
   preload.ts   # contextBridge 暴露 window.jsonEditor
-  upload.ts    # 上传 provider：自定义 API / 本地 userData fallback（含 SSRF 防护）
+  upload.ts    # 上传 provider：自定义 API（multipart POST，含 SSRF 防护）
   settings.ts  # userData/settings.json 读写（Token 留在主进程）
 src/
   App.tsx      # 状态（data + schema）与全部编辑操作 ops

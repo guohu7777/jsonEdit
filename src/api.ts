@@ -1,7 +1,6 @@
 /** What the main process exposes: the stored token stays there, only its presence is reported. */
 export interface PublicSettings {
   upload: {
-    provider: 'auto' | 'api';
     api: {
       url: string;
       fileField: string;
@@ -15,7 +14,6 @@ export interface PublicSettings {
 /** `token`: undefined keeps the stored one, null clears it, a string replaces it. */
 export interface SettingsInput {
   upload: {
-    provider: 'auto' | 'api';
     api: {
       url: string;
       fileField?: string;
@@ -27,17 +25,26 @@ export interface SettingsInput {
 }
 
 export interface UploadConfig {
-  provider: 'api' | 'cos' | 'local';
+  configured: boolean;
   label: string;
   settings: PublicSettings;
 }
 
+let cachedConfig: UploadConfig | null = null;
+
 export async function fetchUploadConfig(): Promise<UploadConfig> {
-  return window.jsonEditor.getUploadConfig();
+  cachedConfig = await window.jsonEditor.getUploadConfig();
+  return cachedConfig;
 }
 
 export async function saveSettings(settings: SettingsInput): Promise<UploadConfig> {
-  return window.jsonEditor.setSettings(settings);
+  cachedConfig = await window.jsonEditor.setSettings(settings);
+  return cachedConfig;
+}
+
+/** Latest config snapshot from fetchUploadConfig/saveSettings; false before either resolves. */
+export function uploadConfigured(): boolean {
+  return cachedConfig?.configured ?? false;
 }
 
 export async function uploadFile(file: File): Promise<string> {

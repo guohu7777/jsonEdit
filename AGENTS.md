@@ -4,7 +4,7 @@
 
 ## 项目是什么
 
-跨平台 Electron 桌面应用：可视化 JSON 编辑器。树形 UI 编辑 JSON；每个字段可选类型；逐字段注释存在独立的 `SchemaNode` 树（导出为 `*.schema.json`）；「文件」类型字段经主进程上传（GUI 配置的自定义 API 或本地 fallback）后把 URL 写回 JSON。
+跨平台 Electron 桌面应用：可视化 JSON 编辑器。树形 UI 编辑 JSON；每个字段可选类型；逐字段注释存在独立的 `SchemaNode` 树（导出为 `*.schema.json`）；「文件」类型字段经主进程上传到 GUI 配置的自定义 API（未配置时上传禁用）后把 URL 写回 JSON。
 
 ## 命令
 
@@ -25,7 +25,7 @@ npm run dist           # 产出安装包（AppImage/dmg/nsis，跨平台包需�
 | --- | --- |
 | `electron/main.ts` | BrowserWindow、IPC handler（`upload:config`、`upload:file`、`settings:set`）、上传端点风险确认对话框 |
 | `electron/preload.ts` | contextBridge 暴露 `window.jsonEditor`，渲染进程唯一的主进程入口 |
-| `electron/upload.ts` | 上传 provider：自定义 API（multipart POST，含 SSRF 防护）或本地 `userData/uploads`（返回 `file://` URL） |
+| `electron/upload.ts` | 上传 provider：自定义 API（multipart POST，含 SSRF 防护） |
 | `electron/settings.ts` | `userData/settings.json` 读写、归一化；Token 只留主进程（`mergeSettings`/`toPublicSettings`） |
 | `src/App.tsx` | 全部状态（`data` + `schema`）与 `ops` 操作集（setValue/setType/setComment/setOptions/renameKey/deleteNode/addChild）、主题切换 |
 | `src/theme.ts` | Mantine `createTheme`：`brand`（Teal 色阶）/`lime` 色阶、`primaryShade`、字体、`autoContrast` |
@@ -52,13 +52,12 @@ npm run dist           # 产出安装包（AppImage/dmg/nsis，跨平台包需�
 - **preload 文件名**：构建产物是 `out/preload/preload.mjs`（不是 index.js）。ESM preload 要求 `sandbox: false`；改了 preload 输出名必须同步 `main.ts` 里的路径。
 - **产物目录名**：electron-vite 按入口文件名输出 `out/main/main.js`、`out/renderer/index.html`；`package.json` 的 `main` 字段要对应。
 - **上传 API 安全链**：`inspectEndpoint` 解析 DNS 判定内网/http 风险 → 需用户原生对话框确认（`allowPrivate`/`allowHttp`/`privateAddrs` 由主进程写入，renderer 输入不生效）→ 请求按确认地址 pinned lookup 发起、不跟随重定向。改端点校验时 `settings.ts` 归一化、`main.ts` 确认流程、`upload.ts` assert、`App.tsx` 表单四处要同步看。
-- **`webSecurity: false`**：本地 fallback 返回 `file://` URL，预览图片需要它；如要收紧请同步改预览逻辑。
 - **IPC 传 ArrayBuffer**：`upload:file` 的 payload 是 `{name, mimeType, data:ArrayBuffer}`，renderer 端先 `file.arrayBuffer()`；不要传 File/Blob 对象（structured clone 不支持）。
 - **数组项共享 schema**：`item` 只有一份，不要按索引存 schema；数组删除/重排不影响注释。
-- **不要提交**：`uploads/`、`out/`、`release/`、`node_modules/`（已在 .gitignore）。上传 Token 存 `userData/settings.json`，不进 git。
+- **不要提交**：`out/`、`release/`、`node_modules/`（已在 .gitignore）。上传 Token 存 `userData/settings.json`，不进 git。
 
 ## 常用片段
 
 新增一个字段类型：在 `types.ts` 的 `FieldType`/`LEAF_TYPES`/`TYPE_LABELS` 加项 → `schema.ts` 补 `defaultValue`/`coerceValue`/`inferType` → `ValueEditor.tsx` 加输入控件分支。
 
-新增一个上传 provider：`upload.ts` 仿 `uploadToApi`/`uploadLocal` 写 `uploadToX` → `isApiConfigured`/`activeProvider` 处加分支 → `settings.ts` 的 `Settings`/`DEFAULTS`/`normalize` 补配置项（如需 GUI 配置再改 `App.tsx` 设置表单）→ README「上传配置」节补说明。
+新增一个上传 provider：`upload.ts` 仿 `uploadToApi` 写 `uploadToX` → `isApiConfigured`/`uploadFile` 处加分支 → `settings.ts` 的 `Settings`/`DEFAULTS`/`normalize` 补配置项（如需 GUI 配置再改 `App.tsx` 设置表单）→ README「上传配置」节补说明。

@@ -18,7 +18,6 @@ export interface ApiUploadConfig {
 
 export interface Settings {
   upload: {
-    provider: 'auto' | 'api';
     api: ApiUploadConfig;
   };
 }
@@ -26,7 +25,6 @@ export interface Settings {
 /** Settings shape exposed to the renderer: the bearer token never leaves the main process. */
 export interface PublicSettings {
   upload: {
-    provider: 'auto' | 'api';
     api: {
       url: string;
       fileField: string;
@@ -40,7 +38,6 @@ export interface PublicSettings {
 /** Settings shape accepted from the renderer. `token`: undefined keeps, null clears, string sets. */
 export interface SettingsInput {
   upload: {
-    provider: 'auto' | 'api';
     api: {
       url: string;
       fileField?: string;
@@ -53,7 +50,6 @@ export interface SettingsInput {
 
 const DEFAULTS: Settings = {
   upload: {
-    provider: 'auto',
     api: { url: '', token: '', fileField: 'file', urlField: 'url' },
   },
 };
@@ -89,7 +85,6 @@ function normalize(raw: unknown): Settings {
   const api = asRecord(upload.api);
   return {
     upload: {
-      provider: upload.provider === 'api' ? 'api' : 'auto',
       api: {
         url: asString(api.url, DEFAULTS.upload.api.url),
         token: asString(api.token, ''),
@@ -119,10 +114,9 @@ export function getSettings(): Settings {
 }
 
 export function toPublicSettings(settings: Settings): PublicSettings {
-  const { provider, api } = settings.upload;
+  const { api } = settings.upload;
   return {
     upload: {
-      provider,
       api: {
         url: api.url,
         fileField: api.fileField || 'file',
@@ -139,7 +133,7 @@ export function mergeSettings(input: SettingsInput): Settings {
   const upload = asRecord(asRecord(input).upload);
   const api = asRecord(upload.api);
   const token = api.token === undefined ? (getSettings().upload.api.token ?? '') : api.token;
-  const merged = normalize({ upload: { provider: upload.provider, api: { ...api, token } } });
+  const merged = normalize({ upload: { api: { ...api, token } } });
   // Risk flags are derived from the user's native-dialog confirmation, never from renderer input.
   merged.upload.api.allowPrivate = false;
   merged.upload.api.allowHttp = false;
