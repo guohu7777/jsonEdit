@@ -7,6 +7,8 @@ export interface ApiUploadConfig {
   token?: string;
   fileField?: string;
   urlField?: string;
+  /** Extra query params appended to the upload request URL (?k=v&…). */
+  query?: Record<string, string>;
   /** Set by the main process only, after the user confirmed the risk in a native dialog. */
   allowPrivate?: boolean;
   allowHttp?: boolean;
@@ -30,6 +32,7 @@ export interface PublicSettings {
       fileField: string;
       urlField: string;
       hasToken: boolean;
+      query: Record<string, string>;
     };
   };
 }
@@ -42,6 +45,7 @@ export interface SettingsInput {
       url: string;
       fileField?: string;
       urlField?: string;
+      query?: Record<string, string>;
       token?: string | null;
     };
   };
@@ -70,6 +74,16 @@ function asString(value: unknown, fallback: string): string {
   return typeof value === 'string' ? value : fallback;
 }
 
+/** Keeps only non-empty keys with string values; trims key whitespace. */
+function normalizeQuery(raw: unknown): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(asRecord(raw))) {
+    const key = k.trim();
+    if (key && typeof v === 'string') out[key] = v;
+  }
+  return out;
+}
+
 function normalize(raw: unknown): Settings {
   const upload = asRecord(asRecord(raw).upload);
   const api = asRecord(upload.api);
@@ -81,6 +95,7 @@ function normalize(raw: unknown): Settings {
         token: asString(api.token, ''),
         fileField: asString(api.fileField, 'file') || 'file',
         urlField: asString(api.urlField, 'url') || 'url',
+        query: normalizeQuery(api.query),
         allowPrivate: api.allowPrivate === true,
         allowHttp: api.allowHttp === true,
         privateAddrs: Array.isArray(api.privateAddrs)
@@ -113,6 +128,7 @@ export function toPublicSettings(settings: Settings): PublicSettings {
         fileField: api.fileField || 'file',
         urlField: api.urlField || 'url',
         hasToken: Boolean(api.token),
+        query: api.query ?? {},
       },
     },
   };

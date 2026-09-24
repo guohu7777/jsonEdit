@@ -10,6 +10,7 @@ import {
   SegmentedControl,
   Select,
   Stack,
+  Text,
   TextInput,
   Title,
   useComputedColorScheme,
@@ -21,9 +22,11 @@ import {
   IconEraser,
   IconFileImport,
   IconMoon,
+  IconPlus,
   IconSchema,
   IconSettings,
   IconSun,
+  IconTrash,
   IconUpload,
 } from '@tabler/icons-react';
 import 'dayjs/locale/zh-cn';
@@ -121,6 +124,7 @@ export default function App() {
   const [tokenEdited, setTokenEdited] = useState(false);
   const [apiFileField, setApiFileField] = useState('file');
   const [apiUrlField, setApiUrlField] = useState('url');
+  const [apiQuery, setApiQuery] = useState<{ key: string; value: string }[]>([]);
   const jsonFileRef = useRef<HTMLInputElement>(null);
   const schemaFileRef = useRef<HTMLInputElement>(null);
 
@@ -196,6 +200,9 @@ export default function App() {
     setTokenEdited(false);
     setApiFileField(s.upload.api.fileField || 'file');
     setApiUrlField(s.upload.api.urlField || 'url');
+    setApiQuery(
+      Object.entries(s.upload.api.query ?? {}).map(([key, value]) => ({ key, value })),
+    );
     setSettingsOpen(true);
   }, [uploadCfg]);
 
@@ -209,6 +216,11 @@ export default function App() {
           token,
           fileField: apiFileField.trim() || 'file',
           urlField: apiUrlField.trim() || 'url',
+          query: Object.fromEntries(
+            apiQuery
+              .map((r) => [r.key.trim(), r.value] as const)
+              .filter(([k]) => k),
+          ),
         },
       },
     };
@@ -218,7 +230,7 @@ export default function App() {
         setSettingsOpen(false);
       })
       .catch((e) => setError(`保存设置失败: ${e instanceof Error ? e.message : e}`));
-  }, [provider, apiUrl, apiToken, tokenEdited, apiFileField, apiUrlField]);
+  }, [provider, apiUrl, apiToken, tokenEdited, apiFileField, apiUrlField, apiQuery]);
 
   const importJson = useCallback((file: File) => {
     file
@@ -323,6 +335,50 @@ export default function App() {
                 value={apiUrlField}
                 onChange={(e) => setApiUrlField(e.target.value)}
               />
+              <Text size="sm" c="dimmed" mt="xs">
+                Query 参数（拼到上传地址 ? 后面）
+              </Text>
+              {apiQuery.map((row, i) => (
+                <Group key={i} gap="xs" wrap="nowrap">
+                  <TextInput
+                    placeholder="参数名"
+                    value={row.key}
+                    style={{ flex: 1 }}
+                    onChange={(e) =>
+                      setApiQuery((q) =>
+                        q.map((r, j) => (j === i ? { ...r, key: e.target.value } : r)),
+                      )
+                    }
+                  />
+                  <TextInput
+                    placeholder="参数值"
+                    value={row.value}
+                    style={{ flex: 1 }}
+                    onChange={(e) =>
+                      setApiQuery((q) =>
+                        q.map((r, j) => (j === i ? { ...r, value: e.target.value } : r)),
+                      )
+                    }
+                  />
+                  <ActionIcon
+                    variant="subtle"
+                    color="red"
+                    title="删除参数"
+                    onClick={() => setApiQuery((q) => q.filter((_, j) => j !== i))}
+                  >
+                    <IconTrash size={14} />
+                  </ActionIcon>
+                </Group>
+              ))}
+              <Button
+                variant="subtle"
+                size="xs"
+                leftSection={<IconPlus size={14} />}
+                style={{ alignSelf: 'flex-start' }}
+                onClick={() => setApiQuery((q) => [...q, { key: '', value: '' }])}
+              >
+                添加参数
+              </Button>
             </>
           )}
           <Group justify="flex-end" mt="xs">

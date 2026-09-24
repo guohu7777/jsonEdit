@@ -7,6 +7,7 @@ export interface PublicSettings {
       fileField: string;
       urlField: string;
       hasToken: boolean;
+      query: Record<string, string>;
     };
   };
 }
@@ -19,6 +20,7 @@ export interface SettingsInput {
       url: string;
       fileField?: string;
       urlField?: string;
+      query?: Record<string, string>;
       token?: string | null;
     };
   };

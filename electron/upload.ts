@@ -219,10 +219,16 @@ async function uploadToApi(
     data,
     Buffer.from(`\r\n--${boundary}--\r\n`),
   ]);
+  // Custom query params ride on the request URL only — they cannot change the
+  // validated origin, so the endpoint check above stays authoritative.
+  const requestUrl = new URL(endpoint.href);
+  for (const [k, v] of Object.entries(api.query ?? {})) {
+    requestUrl.searchParams.set(k, v);
+  }
   const doRequest = endpoint.protocol === 'https:' ? httpsRequest : httpRequest;
   const res = await new Promise<IncomingMessage>((resolvePromise, reject) => {
     const req = doRequest(
-      endpoint,
+      requestUrl,
       {
         method: 'POST',
         headers: {
