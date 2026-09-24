@@ -8,7 +8,6 @@ import {
   Modal,
   PasswordInput,
   SegmentedControl,
-  Select,
   Stack,
   Text,
   TextInput,
@@ -118,7 +117,6 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [cfgLoading, setCfgLoading] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [provider, setProvider] = useState<'auto' | 'api'>('auto');
   const [apiUrl, setApiUrl] = useState('');
   const [apiToken, setApiToken] = useState('');
   const [tokenEdited, setTokenEdited] = useState(false);
@@ -194,7 +192,6 @@ export default function App() {
   const openSettings = useCallback(() => {
     if (!uploadCfg) return;
     const s = uploadCfg.settings;
-    setProvider(s.upload.provider);
     setApiUrl(s.upload.api.url);
     setApiToken('');
     setTokenEdited(false);
@@ -210,7 +207,6 @@ export default function App() {
     const token = tokenEdited ? (apiToken.trim() || null) : undefined;
     const next: SettingsInput = {
       upload: {
-        provider,
         api: {
           url: apiUrl.trim(),
           token,
@@ -230,7 +226,7 @@ export default function App() {
         setSettingsOpen(false);
       })
       .catch((e) => setError(`保存设置失败: ${e instanceof Error ? e.message : e}`));
-  }, [provider, apiUrl, apiToken, tokenEdited, apiFileField, apiUrlField, apiQuery]);
+  }, [apiUrl, apiToken, tokenEdited, apiFileField, apiUrlField, apiQuery]);
 
   const importJson = useCallback((file: File) => {
     file
@@ -296,91 +292,80 @@ export default function App() {
         centered
       >
         <Stack gap="sm" className="settings-form">
-          <Select
-            label="上传方式"
-            value={provider}
-            onChange={(v) => setProvider(v === 'api' ? 'api' : 'auto')}
-            allowDeselect={false}
-            data={[
-              { value: 'api', label: '自定义 API（POST 文件，取响应里的 URL）' },
-              { value: 'auto', label: '自动（本地应用数据目录）' },
-            ]}
+          <Text size="sm" c="dimmed">
+            文件字段会上传到自定义 API（POST multipart），响应里的 URL 字段写回 JSON。留空 API 地址表示不上传。
+          </Text>
+          <TextInput
+            label="API 地址"
+            placeholder="https://example.com/upload"
+            value={apiUrl}
+            onChange={(e) => setApiUrl(e.target.value)}
           />
-          {provider === 'api' && (
-            <>
+          <PasswordInput
+            label="Token（可选，Bearer）"
+            placeholder={
+              uploadCfg?.settings.upload.api.hasToken ? '已保存，留空不修改' : '未设置'
+            }
+            value={apiToken}
+            onChange={(e) => {
+              setApiToken(e.target.value);
+              setTokenEdited(true);
+            }}
+          />
+          <TextInput
+            label="文件字段名"
+            value={apiFileField}
+            onChange={(e) => setApiFileField(e.target.value)}
+          />
+          <TextInput
+            label="响应 URL 字段（支持 data.url 嵌套路径）"
+            value={apiUrlField}
+            onChange={(e) => setApiUrlField(e.target.value)}
+          />
+          <Text size="sm" c="dimmed" mt="xs">
+            Query 参数（拼到上传地址 ? 后面）
+          </Text>
+          {apiQuery.map((row, i) => (
+            <Group key={i} gap="xs" wrap="nowrap">
               <TextInput
-                label="API 地址"
-                placeholder="https://example.com/upload"
-                value={apiUrl}
-                onChange={(e) => setApiUrl(e.target.value)}
-              />
-              <PasswordInput
-                label="Token（可选，Bearer）"
-                placeholder={
-                  uploadCfg?.settings.upload.api.hasToken ? '已保存，留空不修改' : '未设置'
+                placeholder="参数名"
+                value={row.key}
+                style={{ flex: 1 }}
+                onChange={(e) =>
+                  setApiQuery((q) =>
+                    q.map((r, j) => (j === i ? { ...r, key: e.target.value } : r)),
+                  )
                 }
-                value={apiToken}
-                onChange={(e) => {
-                  setApiToken(e.target.value);
-                  setTokenEdited(true);
-                }}
               />
               <TextInput
-                label="文件字段名"
-                value={apiFileField}
-                onChange={(e) => setApiFileField(e.target.value)}
+                placeholder="参数值"
+                value={row.value}
+                style={{ flex: 1 }}
+                onChange={(e) =>
+                  setApiQuery((q) =>
+                    q.map((r, j) => (j === i ? { ...r, value: e.target.value } : r)),
+                  )
+                }
               />
-              <TextInput
-                label="响应 URL 字段（支持 data.url 嵌套路径）"
-                value={apiUrlField}
-                onChange={(e) => setApiUrlField(e.target.value)}
-              />
-              <Text size="sm" c="dimmed" mt="xs">
-                Query 参数（拼到上传地址 ? 后面）
-              </Text>
-              {apiQuery.map((row, i) => (
-                <Group key={i} gap="xs" wrap="nowrap">
-                  <TextInput
-                    placeholder="参数名"
-                    value={row.key}
-                    style={{ flex: 1 }}
-                    onChange={(e) =>
-                      setApiQuery((q) =>
-                        q.map((r, j) => (j === i ? { ...r, key: e.target.value } : r)),
-                      )
-                    }
-                  />
-                  <TextInput
-                    placeholder="参数值"
-                    value={row.value}
-                    style={{ flex: 1 }}
-                    onChange={(e) =>
-                      setApiQuery((q) =>
-                        q.map((r, j) => (j === i ? { ...r, value: e.target.value } : r)),
-                      )
-                    }
-                  />
-                  <ActionIcon
-                    variant="subtle"
-                    color="red"
-                    title="删除参数"
-                    onClick={() => setApiQuery((q) => q.filter((_, j) => j !== i))}
-                  >
-                    <IconTrash size={14} />
-                  </ActionIcon>
-                </Group>
-              ))}
-              <Button
+              <ActionIcon
                 variant="subtle"
-                size="xs"
-                leftSection={<IconPlus size={14} />}
-                style={{ alignSelf: 'flex-start' }}
-                onClick={() => setApiQuery((q) => [...q, { key: '', value: '' }])}
+                color="red"
+                title="删除参数"
+                onClick={() => setApiQuery((q) => q.filter((_, j) => j !== i))}
               >
-                添加参数
-              </Button>
-            </>
-          )}
+                <IconTrash size={14} />
+              </ActionIcon>
+            </Group>
+          ))}
+          <Button
+            variant="subtle"
+            size="xs"
+            leftSection={<IconPlus size={14} />}
+            style={{ alignSelf: 'flex-start' }}
+            onClick={() => setApiQuery((q) => [...q, { key: '', value: '' }])}
+          >
+            添加参数
+          </Button>
           <Group justify="flex-end" mt="xs">
             <Button variant="default" onClick={() => setSettingsOpen(false)}>
               取消
@@ -449,7 +434,7 @@ export default function App() {
         </Group>
         <Badge
           variant="light"
-          color="lime"
+          color={uploadCfg?.configured ? 'lime' : 'gray'}
           leftSection={<IconUpload size={12} />}
           className="provider-tag"
         >

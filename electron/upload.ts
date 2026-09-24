@@ -1,18 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { lookup } from 'node:dns/promises';
 import type { LookupAddress } from 'node:dns';
-import { mkdirSync } from 'node:fs';
-import { writeFile } from 'node:fs/promises';
 import { request as httpRequest, type IncomingMessage } from 'node:http';
 import { request as httpsRequest } from 'node:https';
 import type { LookupFunction } from 'node:net';
-import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { app } from 'electron';
 
 import { getSettings, type ApiUploadConfig } from './settings';
-
-export type UploadProvider = 'api' | 'local';
 
 /** Only http(s) endpoints may be called from the main process. */
 export function parseApiUrl(url: string): URL {
@@ -137,28 +130,7 @@ export function assertEndpointAllowed(
 }
 
 export function isApiConfigured(): boolean {
-  const s = getSettings();
-  return s.upload.provider === 'api' && Boolean(s.upload.api.url);
-}
-
-export function activeProvider(): UploadProvider {
-  return isApiConfigured() ? 'api' : 'local';
-}
-
-export function uploadProviderLabel(): string {
-  return activeProvider() === 'api' ? '自定义 API' : '本地应用数据目录';
-}
-
-function safeFileName(originalName: string): string {
-  return originalName.split(/[\\/]/).pop()?.replace(/[^\w.-]/g, '_') || 'file';
-}
-
-async function uploadLocal(data: Buffer, name: string): Promise<string> {
-  const dir = join(app.getPath('userData'), 'uploads');
-  mkdirSync(dir, { recursive: true });
-  const dest = join(dir, `${randomUUID()}-${safeFileName(name)}`);
-  await writeFile(dest, data);
-  return pathToFileURL(dest).href;
+  return Boolean(getSettings().upload.api.url);
 }
 
 function resolveField(json: unknown, fieldPath: string): unknown {
@@ -268,10 +240,10 @@ export async function uploadFile(
   mimeType: string,
   check?: EndpointCheck,
 ): Promise<string> {
-  if (isApiConfigured()) {
-    const api = getSettings().upload.api;
-    const resolved = check ?? (await inspectEndpoint(api.url));
-    return uploadToApi(data, name, mimeType, api, resolved);
+  if (!isApiConfigured()) {
+    throw new Error('未配置上传 API，请先在「上传设置」中配置');
   }
-  return uploadLocal(data, name);
+  const api = getSettings().upload.api;
+  const resolved = check ?? (await inspectEndpoint(api.url));
+  return uploadToApi(data, name, mimeType, api, resolved);
 }

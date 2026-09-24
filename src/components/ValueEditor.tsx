@@ -14,7 +14,7 @@ import {
 import { DatePickerInput } from '@mantine/dates';
 import { IconPlayerPlayFilled, IconUpload } from '@tabler/icons-react';
 import type { FieldType, JsonValue } from '../types';
-import { uploadFile } from '../api';
+import { uploadConfigured, uploadFile } from '../api';
 
 interface Props {
   type: FieldType;
@@ -42,6 +42,7 @@ function FileEditor({
   const [error, setError] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const url = typeof value === 'string' ? value : '';
+  const canUpload = uploadConfigured();
   const isVideo = mediaHint === 'video' || (mediaHint === undefined && VIDEO_RE.test(url));
   const isImage = mediaHint === 'image' || (mediaHint === undefined && IMAGE_RE.test(url));
   const hasPreview = (isImage || isVideo) && url;
@@ -71,6 +72,8 @@ function FileEditor({
         size="xs"
         leftSection={<IconUpload size={14} />}
         loading={busy}
+        disabled={!canUpload}
+        title={canUpload ? undefined : '先在「上传设置」中配置 API'}
         onClick={() => fileRef.current?.click()}
       >
         上传文件

@@ -3,7 +3,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type { PublicSettings, SettingsInput } from './settings';
 
 export interface UploadConfigInfo {
-  provider: 'api' | 'cos' | 'local';
+  configured: boolean;
   label: string;
   settings: PublicSettings;
 }

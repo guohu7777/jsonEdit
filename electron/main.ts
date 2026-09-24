@@ -18,13 +18,11 @@ import {
   type SettingsInput,
 } from './settings';
 import {
-  activeProvider,
   endpointConfirmed,
   inspectEndpoint,
   isApiConfigured,
   parseApiUrl,
   uploadFile,
-  uploadProviderLabel,
   type EndpointCheck,
 } from './upload';
 
@@ -38,8 +36,6 @@ function createWindow(): void {
       nodeIntegration: false,
       // sandboxed preloads must be CJS; this build emits ESM, so keep sandbox off.
       sandbox: false,
-      // Renderer may hold file:// URLs written by the local upload fallback.
-      webSecurity: false,
     },
   });
 
@@ -56,9 +52,10 @@ function createWindow(): void {
 }
 
 function uploadConfig() {
+  const configured = isApiConfigured();
   return {
-    provider: activeProvider(),
-    label: uploadProviderLabel(),
+    configured,
+    label: configured ? '自定义 API' : '未配置',
     settings: toPublicSettings(getSettings()),
   };
 }
@@ -119,9 +116,8 @@ ipcMain.handle('theme:set', (event, mode: unknown) => {
 ipcMain.handle('settings:set', async (event, input: SettingsInput) => {
   if (!trustedRenderer(event)) throw new Error('Untrusted sender');
   const next = mergeSettings(input);
-  const { provider, api } = next.upload;
-  // The API URL only matters for the custom provider; in auto mode it is inert.
-  if (provider === 'api' && api.url) {
+  const { api } = next.upload;
+  if (api.url) {
     const check = await inspectEndpoint(api.url);
     // Only risky endpoints need consent, and an unchanged confirmed profile doesn't re-prompt.
     // endpointConfirmed returns true for an unparseable previous URL (e.g. a fresh empty
