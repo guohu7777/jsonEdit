@@ -114,8 +114,11 @@ ipcMain.handle('settings:set', async (event, input: SettingsInput) => {
   if (provider === 'api' && api.url) {
     const check = await inspectEndpoint(api.url);
     // Only risky endpoints need consent, and an unchanged confirmed profile doesn't re-prompt.
+    // endpointConfirmed returns true for an unparseable previous URL (e.g. a fresh empty
+    // config), which must NOT count as prior consent — require a real previous URL.
     const prev = getSettings().upload.api;
-    if ((check.isPrivate || check.isHttp) && !endpointConfirmed(prev, check)) {
+    const alreadyConfirmed = Boolean(prev.url) && endpointConfirmed(prev, check);
+    if ((check.isPrivate || check.isHttp) && !alreadyConfirmed) {
       const win = BrowserWindow.fromWebContents(event.sender);
       const changed = Boolean(prev.privateAddrs?.length);
       if (!(await confirmEndpoint(win, check.endpoint, { ...check, changed }))) {
