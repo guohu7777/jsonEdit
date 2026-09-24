@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Button, Checkbox, ColorPicker, DatePicker, Input, InputNumber, Modal, Select, Typography } from 'antd';
+import { Button, Checkbox, ColorPicker, DatePicker, Image, Input, InputNumber, Modal, Select, Typography } from 'antd';
 import { PlayCircleOutlined, UploadOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import type { FieldType, JsonValue } from '../types';
@@ -74,7 +74,9 @@ function FileEditor({
           e.target.value = '';
         }}
       />
-      {isImage && url && <img className="file-preview" src={url} alt="" />}
+      {isImage && url && (
+        <Image className="file-preview-img" src={url} alt="" preview={{ mask: '预览' }} />
+      )}
       {isVideo && url && (
         <>
           <button
