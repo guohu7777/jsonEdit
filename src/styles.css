@@ -1,12 +1,29 @@
+/* Light theme (default) */
 :root {
-  --bg: #0f141f;
-  --panel: #141a26;
-  --panel-2: #1a2233;
-  --border: #2a3450;
-  --text: #e6eaf2;
-  --muted: #8b95ad;
-  --accent: #3b82f6;
+  color-scheme: light;
+  --bg: #edf1f4;
+  --panel: #ffffff;
+  --panel-2: #f0f6f5;
+  --border: #d9e3e6;
+  --text: #13272b;
+  --muted: #5b7278;
+  --accent: #0d9488;
+  --comment: #b45309;
+  --node-key: #0f766e;
+}
+
+/* Dark theme */
+:root[data-mantine-color-scheme="dark"] {
+  color-scheme: dark;
+  --bg: #0d1418;
+  --panel: #121c22;
+  --panel-2: #18262e;
+  --border: #263a44;
+  --text: #e8f2f2;
+  --muted: #87a0a9;
+  --accent: #2dd4bf;
   --comment: #f0b429;
+  --node-key: #5eead4;
 }
 
 * {
@@ -39,7 +56,7 @@ body {
   flex-wrap: wrap;
 }
 
-.app-title.ant-typography {
+.app-title {
   margin: 0;
   font-size: 15px;
   color: var(--text);
@@ -113,53 +130,67 @@ body {
 .node-name {
   min-width: 90px;
   font-family: "JetBrains Mono", Menlo, Consolas, monospace;
-  color: #7dd3fc;
+  color: var(--node-key);
   flex: none;
 }
 
-.node-name.editable.ant-input {
-  width: auto;
-  min-width: 90px;
-  max-width: 200px;
-  padding: 1px 6px;
+.node-name.editable {
+  flex: none;
+  width: 140px;
+}
+
+.node-name.editable input {
   font-family: "JetBrains Mono", Menlo, Consolas, monospace;
   font-size: 12px;
-  color: #7dd3fc;
+  color: var(--node-key);
 }
 
 .size-badge {
-  font-size: 11px;
   flex: none;
 }
 
 .type-select {
   flex: none;
-  min-width: 78px;
+  width: 84px;
 }
 
 .value-input {
-  min-width: 160px;
+  flex: none;
+  width: 170px;
+}
+
+.value-input input,
+.value-input textarea {
   font-family: "JetBrains Mono", Menlo, Consolas, monospace;
   font-size: 12px;
 }
 
 .value-input.url {
-  min-width: 240px;
+  width: 250px;
 }
 
 .value-textarea {
+  flex: none;
   width: 320px;
+}
+
+.value-textarea textarea {
   font-family: inherit;
   font-size: 12px;
 }
 
-.options-input.ant-input {
+.options-input {
+  flex: none;
   width: 160px;
+}
+
+.options-input input {
   border-style: dashed;
 }
 
-.comment-btn.has-comment {
-  color: var(--comment);
+.comment-input {
+  width: 320px;
+  margin: 2px 0 2px 26px;
 }
 
 .comment-text {
@@ -173,11 +204,6 @@ body {
 .comment-text::before {
   content: "// ";
   opacity: 0.6;
-}
-
-.comment-input.ant-input {
-  width: 320px;
-  margin: 2px 0 2px 26px;
 }
 
 .file-editor {
@@ -194,9 +220,7 @@ body {
   border: 1px solid var(--border);
 }
 
-/* antd Image (click-to-preview) puts className on the <img> itself;
-   extra .ant-image ancestor needed to beat antd's .ant-image .ant-image-img rule */
-.ant-image img.file-preview-img {
+.file-preview-img {
   height: 48px;
   width: auto;
   max-width: 96px;
@@ -204,9 +228,6 @@ body {
   border-radius: 4px;
   border: 1px solid var(--border);
   cursor: zoom-in;
-}
-.ant-image .ant-image-mask {
-  border-radius: 4px;
 }
 
 .video-thumb {
@@ -223,20 +244,28 @@ body {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  font-size: 22px;
   color: #fff;
-  text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+  filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.8));
   pointer-events: none;
 }
 
+/* Preview modal: show media at natural size, only shrink past viewport bounds */
+.img-preview-full {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 82vw;
+  max-height: 78vh;
+  border-radius: 6px;
+}
+
 .video-modal-player {
-  width: 100%;
+  width: min(720px, 82vw);
   max-height: 70vh;
   background: #000;
 }
 
 .field-error {
-  font-size: 11px;
   max-width: 220px;
 }
 
@@ -271,25 +300,22 @@ body {
 
 .res-header {
   padding-top: 2px;
-  font-size: 11px;
 }
 
 .res-id,
+.res-name,
 .res-type {
   width: 100%;
 }
 
-.res-name {
-  width: 100%;
-}
-
-.mono {
+.mono input {
   font-family: "JetBrains Mono", Menlo, Consolas, monospace;
 }
 
 .res-row .value-input.url {
-  min-width: 0;
   flex: 1;
+  width: auto;
+  min-width: 0;
 }
 
 .res-row .file-editor {
@@ -297,7 +323,7 @@ body {
   min-width: 0;
 }
 
-.res-row .file-editor .ant-input {
+.res-row .file-editor .value-input {
   flex: 1;
   min-width: 0;
 }
@@ -310,23 +336,4 @@ body {
 
 .res-add {
   margin-top: 8px;
-}
-
-/* ---- upload settings modal ---- */
-
-.settings-form {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding-top: 8px;
-}
-
-.settings-label {
-  font-size: 12px;
-  color: var(--muted);
-  margin-top: 8px;
-}
-
-.settings-field {
-  width: 100%;
 }

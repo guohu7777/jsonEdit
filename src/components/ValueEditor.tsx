@@ -1,7 +1,18 @@
 import { useRef, useState } from 'react';
-import { Button, Checkbox, ColorPicker, DatePicker, Image, Input, InputNumber, Modal, Select, Typography } from 'antd';
-import { PlayCircleOutlined, UploadOutlined } from '@ant-design/icons';
-import dayjs from 'dayjs';
+import {
+  Button,
+  Checkbox,
+  ColorInput,
+  Image,
+  Modal,
+  NumberInput,
+  Select,
+  Text,
+  Textarea,
+  TextInput,
+} from '@mantine/core';
+import { DatePickerInput } from '@mantine/dates';
+import { IconPlayerPlayFilled, IconUpload } from '@tabler/icons-react';
 import type { FieldType, JsonValue } from '../types';
 import { uploadFile } from '../api';
 
@@ -33,6 +44,7 @@ function FileEditor({
   const url = typeof value === 'string' ? value : '';
   const isVideo = mediaHint === 'video' || (mediaHint === undefined && VIDEO_RE.test(url));
   const isImage = mediaHint === 'image' || (mediaHint === undefined && IMAGE_RE.test(url));
+  const hasPreview = (isImage || isVideo) && url;
 
   const pick = async (file: File) => {
     setBusy(true);
@@ -48,17 +60,16 @@ function FileEditor({
 
   return (
     <span className="file-editor">
-      <Input
-        size="small"
+      <TextInput
+        size="xs"
         className="value-input url"
         value={url}
         placeholder="上传后自动填入 URL"
         onChange={(e) => onChange(e.target.value)}
       />
       <Button
-        size="small"
-        type="primary"
-        icon={<UploadOutlined />}
+        size="xs"
+        leftSection={<IconUpload size={14} />}
         loading={busy}
         onClick={() => fileRef.current?.click()}
       >
@@ -75,35 +86,45 @@ function FileEditor({
         }}
       />
       {isImage && url && (
-        <Image className="file-preview-img" src={url} alt="" preview={{ mask: '预览' }} />
+        <Image
+          src={url}
+          alt=""
+          className="file-preview-img"
+          title="预览图片"
+          onClick={() => setPreviewOpen(true)}
+        />
       )}
       {isVideo && url && (
-        <>
-          <button
-            type="button"
-            className="video-thumb"
-            title="预览视频"
-            onClick={() => setPreviewOpen(true)}
-          >
-            <video className="file-preview" src={url} muted preload="metadata" />
-            <PlayCircleOutlined className="video-thumb-badge" />
-          </button>
-          <Modal
-            open={previewOpen}
-            onCancel={() => setPreviewOpen(false)}
-            footer={null}
-            centered
-            destroyOnHidden
-            width="min(720px, 80vw)"
-          >
+        <button
+          type="button"
+          className="video-thumb"
+          title="预览视频"
+          onClick={() => setPreviewOpen(true)}
+        >
+          <video className="file-preview" src={url} muted preload="metadata" />
+          <IconPlayerPlayFilled size={22} className="video-thumb-badge" />
+        </button>
+      )}
+      {hasPreview && (
+        <Modal
+          opened={previewOpen}
+          onClose={() => setPreviewOpen(false)}
+          centered
+          padding="xs"
+          size="fit-content"
+          styles={{ content: { maxWidth: '90vw', maxHeight: '90vh', overflow: 'auto' } }}
+        >
+          {isVideo ? (
             <video className="video-modal-player" src={url} controls autoPlay />
-          </Modal>
-        </>
+          ) : (
+            <img className="img-preview-full" src={url} alt="" />
+          )}
+        </Modal>
       )}
       {error && (
-        <Typography.Text type="danger" className="field-error">
+        <Text c="red" size="xs" className="field-error" span>
           {error}
-        </Typography.Text>
+        </Text>
       )}
     </span>
   );
@@ -112,60 +133,81 @@ function FileEditor({
 export function ValueEditor({ type, value, options, onChange, mediaHint }: Props) {
   switch (type) {
     case 'boolean':
-      return <Checkbox checked={value === true} onChange={(e) => onChange(e.target.checked)} />;
+      return (
+        <Checkbox
+          size="xs"
+          checked={value === true}
+          onChange={(e) => onChange(e.target.checked)}
+        />
+      );
     case 'null':
-      return <Typography.Text type="secondary" italic>null</Typography.Text>;
+      return (
+        <Text c="dimmed" fs="italic" size="xs" span>
+          null
+        </Text>
+      );
     case 'number':
       return (
-        <InputNumber
-          size="small"
+        <NumberInput
+          size="xs"
           className="value-input"
+          hideControls
           value={typeof value === 'number' ? value : 0}
-          onChange={(n) => onChange(typeof n === 'number' ? n : 0)}
+          onChange={(n) => onChange(typeof n === 'number' ? n : Number(n) || 0)}
         />
       );
     case 'longtext':
       return (
-        <Input.TextArea
+        <Textarea
+          size="xs"
           className="value-textarea"
+          autosize
+          minRows={2}
+          maxRows={8}
           value={typeof value === 'string' ? value : ''}
           onChange={(e) => onChange(e.target.value)}
-          autoSize={{ minRows: 2, maxRows: 8 }}
         />
       );
     case 'date':
       return (
-        <DatePicker
-          size="small"
-          value={typeof value === 'string' && value ? dayjs(value) : null}
-          onChange={(d) => onChange(d ? d.format('YYYY-MM-DD') : '')}
+        <DatePickerInput
+          size="xs"
+          className="value-input"
+          locale="zh-cn"
+          valueFormat="YYYY-MM-DD"
+          clearable
+          value={typeof value === 'string' && value ? value : null}
+          onChange={(d) => onChange(d ?? '')}
         />
       );
     case 'color':
       return (
-        <ColorPicker
-          size="small"
-          showText
-          value={typeof value === 'string' ? value : '#3b82f6'}
-          onChange={(c) => onChange(c.toHexString())}
+        <ColorInput
+          size="xs"
+          className="value-input"
+          format="hex"
+          fixOnBlur
+          value={typeof value === 'string' ? value : '#14b8a6'}
+          onChange={onChange}
         />
       );
     case 'select':
       return (
         <Select
-          size="small"
+          size="xs"
           className="value-input"
           value={typeof value === 'string' ? value : ''}
-          options={(options ?? []).map((o) => ({ value: o, label: o }))}
-          onChange={(v) => onChange(v)}
+          data={options ?? []}
+          allowDeselect={false}
+          onChange={(v) => onChange(v ?? '')}
         />
       );
     case 'file':
       return <FileEditor value={value} onChange={onChange} mediaHint={mediaHint} />;
     case 'url':
       return (
-        <Input
-          size="small"
+        <TextInput
+          size="xs"
           className="value-input url"
           value={typeof value === 'string' ? value : ''}
           placeholder="https://…"
@@ -174,8 +216,8 @@ export function ValueEditor({ type, value, options, onChange, mediaHint }: Props
       );
     default:
       return (
-        <Input
-          size="small"
+        <TextInput
+          size="xs"
           className="value-input"
           value={typeof value === 'string' ? value : String(value ?? '')}
           onChange={(e) => onChange(e.target.value)}

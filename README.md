@@ -77,4 +77,4 @@ src/
 electron.vite.config.ts  # electron-vite 三端构建
 ```
 
-技术栈：Electron + electron-vite + React 19 + TypeScript + Ant Design。
+技术栈：Electron + electron-vite + React 19 + TypeScript + Mantine 8（深/浅双主题，localStorage 持久化）。

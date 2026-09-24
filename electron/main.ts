@@ -5,6 +5,7 @@ import {
   app,
   dialog,
   ipcMain,
+  nativeTheme,
   shell,
   type IpcMainInvokeEvent,
 } from 'electron';
@@ -104,6 +105,15 @@ async function confirmEndpoint(
 ipcMain.handle('upload:config', (event) => {
   if (!trustedRenderer(event)) throw new Error('Untrusted sender');
   return uploadConfig();
+});
+
+// UI theme is persisted renderer-side (localStorage); the renderer reports the
+// resolved scheme so OS chrome and prefers-color-scheme stay consistent.
+ipcMain.handle('theme:set', (event, mode: unknown) => {
+  if (!trustedRenderer(event)) throw new Error('Untrusted sender');
+  if (mode === 'light' || mode === 'dark' || mode === 'system') {
+    nativeTheme.themeSource = mode;
+  }
 });
 
 ipcMain.handle('settings:set', async (event, input: SettingsInput) => {

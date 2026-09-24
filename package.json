@@ -14,8 +14,10 @@
     "dist": "electron-vite build && electron-builder"
   },
   "dependencies": {
-    "@ant-design/icons": "^6.3.4",
-    "antd": "^6.6.5",
+    "@mantine/core": "^8.3.18",
+    "@mantine/dates": "^8.3.18",
+    "@mantine/hooks": "^8.3.18",
+    "@tabler/icons-react": "^3.48.0",
     "dayjs": "^1.11.23",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"

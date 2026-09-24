@@ -46,3 +46,8 @@ export async function uploadFile(file: File): Promise<string> {
     data,
   });
 }
+
+/** Tells the main process the resolved UI theme so OS chrome can follow. */
+export async function setTheme(mode: 'light' | 'dark' | 'system'): Promise<void> {
+  return window.jsonEditor.setTheme(mode);
+}

@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Button, Checkbox, Input, Select, Typography } from 'antd';
-import { DeleteOutlined, DownOutlined, PlusOutlined, RightOutlined } from '@ant-design/icons';
+import { ActionIcon, Button, Checkbox, Select, Text, TextInput } from '@mantine/core';
+import { IconChevronDown, IconChevronRight, IconPlus, IconTrash } from '@tabler/icons-react';
 import type { JsonValue, Path, SchemaNode } from '../types';
 import type { Ops } from '../App';
 import { ValueEditor } from './ValueEditor';
@@ -31,26 +31,27 @@ function ResourceItem({ item, itemSchema, itemPath, ops, onDelete }: ItemProps) 
   return (
     <div className="res-item">
       <div className="res-row">
-        <Input
-          size="small"
+        <TextInput
+          size="xs"
           className="res-id mono"
           placeholder="id"
           value={typeof field('id') === 'string' ? (field('id') as string) : ''}
           onChange={(e) => ops.setValue(fieldPath('id'), e.target.value)}
         />
-        <Input
-          size="small"
+        <TextInput
+          size="xs"
           className="res-name"
           placeholder="名称"
           value={typeof field('name') === 'string' ? (field('name') as string) : ''}
           onChange={(e) => ops.setValue(fieldPath('name'), e.target.value)}
         />
         <Select
-          size="small"
+          size="xs"
           className="res-type"
           value={typeof field('type') === 'string' ? (field('type') as string) : 'image'}
-          options={typeOptions.map((t) => ({ value: t, label: t }))}
-          onChange={(v) => ops.setValue(fieldPath('type'), v)}
+          data={typeOptions}
+          allowDeselect={false}
+          onChange={(v) => ops.setValue(fieldPath('type'), v ?? 'image')}
         />
         <ValueEditor
           type="file"
@@ -65,6 +66,7 @@ function ResourceItem({ item, itemSchema, itemPath, ops, onDelete }: ItemProps) 
           onChange={(v) => ops.setValue(fieldPath('url'), v)}
         />
         <Checkbox
+          size="xs"
           checked={field('cache') === true}
           onChange={(e) =>
             e.target.checked
@@ -73,22 +75,24 @@ function ResourceItem({ item, itemSchema, itemPath, ops, onDelete }: ItemProps) 
           }
         />
         {extraKeys.length > 0 && (
-          <Button
-            size="small"
-            type="text"
+          <ActionIcon
+            size="sm"
+            variant="subtle"
             title="其他字段"
-            icon={showExtra ? <DownOutlined /> : <RightOutlined />}
             onClick={() => setShowExtra((v) => !v)}
-          />
+          >
+            {showExtra ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
+          </ActionIcon>
         )}
-        <Button
-          size="small"
-          type="text"
-          danger
+        <ActionIcon
+          size="sm"
+          variant="subtle"
+          color="red"
           title="删除资源"
-          icon={<DeleteOutlined />}
           onClick={onDelete}
-        />
+        >
+          <IconTrash size={14} />
+        </ActionIcon>
       </div>
       {showExtra && (
         <div className="res-extra">
@@ -123,11 +127,21 @@ export function ResourceList({ items, itemSchema, path, ops, onAdd }: Props) {
   return (
     <div className="res-list">
       <div className="res-row res-header">
-        <Typography.Text type="secondary">ID</Typography.Text>
-        <Typography.Text type="secondary">名称</Typography.Text>
-        <Typography.Text type="secondary">类型</Typography.Text>
-        <Typography.Text type="secondary">URL（点上传自动填入）</Typography.Text>
-        <Typography.Text type="secondary">缓存</Typography.Text>
+        <Text c="dimmed" size="xs" span>
+          ID
+        </Text>
+        <Text c="dimmed" size="xs" span>
+          名称
+        </Text>
+        <Text c="dimmed" size="xs" span>
+          类型
+        </Text>
+        <Text c="dimmed" size="xs" span>
+          URL（点上传自动填入）
+        </Text>
+        <Text c="dimmed" size="xs" span>
+          缓存
+        </Text>
         <span />
         <span />
       </div>
@@ -154,11 +168,12 @@ export function ResourceList({ items, itemSchema, path, ops, onAdd }: Props) {
         ),
       )}
       <Button
-        size="small"
-        type="dashed"
-        block
-        icon={<PlusOutlined />}
+        size="xs"
+        variant="default"
+        fullWidth
+        leftSection={<IconPlus size={14} />}
         className="res-add"
+        style={{ borderStyle: 'dashed' }}
         onClick={onAdd}
       >
         添加资源

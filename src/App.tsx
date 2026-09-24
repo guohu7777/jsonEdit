@@ -1,27 +1,31 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActionIcon,
   Alert,
+  Badge,
   Button,
-  ConfigProvider,
-  Input,
+  Group,
   Modal,
-  Segmented,
+  PasswordInput,
+  SegmentedControl,
   Select,
-  Space,
-  Tag,
-  Typography,
-  theme,
-} from 'antd';
+  Stack,
+  TextInput,
+  Title,
+  useComputedColorScheme,
+  useMantineColorScheme,
+} from '@mantine/core';
 import {
-  ClearOutlined,
-  CopyOutlined,
-  DownloadOutlined,
-  FileTextOutlined,
-  ImportOutlined,
-  SettingOutlined,
-  UploadOutlined,
-} from '@ant-design/icons';
-import zhCN from 'antd/locale/zh_CN';
+  IconCopy,
+  IconDownload,
+  IconEraser,
+  IconFileImport,
+  IconMoon,
+  IconSchema,
+  IconSettings,
+  IconSun,
+  IconUpload,
+} from '@tabler/icons-react';
 import 'dayjs/locale/zh-cn';
 import type { FieldType, JsonValue, Path, SchemaNode } from './types';
 import {
@@ -39,7 +43,13 @@ import {
   uniqueKey,
   updateSchemaAtPath,
 } from './schema';
-import { fetchUploadConfig, saveSettings, type SettingsInput, type UploadConfig } from './api';
+import {
+  fetchUploadConfig,
+  saveSettings,
+  setTheme,
+  type SettingsInput,
+  type UploadConfig,
+} from './api';
 import { TreeNode } from './components/TreeNode';
 import { ResourceList } from './components/ResourceList';
 
@@ -114,12 +124,24 @@ export default function App() {
   const jsonFileRef = useRef<HTMLInputElement>(null);
   const schemaFileRef = useRef<HTMLInputElement>(null);
 
+  const { colorScheme, setColorScheme } = useMantineColorScheme();
+  const computedScheme = useComputedColorScheme('dark');
+
   useEffect(() => {
     fetchUploadConfig()
       .then(setUploadCfg)
       .catch((e) => setError(`读取上传设置失败: ${e instanceof Error ? e.message : e}`))
       .finally(() => setCfgLoading(false));
   }, []);
+
+  // Keep the OS-level theme (window chrome, prefers-color-scheme) in sync.
+  useEffect(() => {
+    void setTheme(colorScheme === 'auto' ? 'system' : colorScheme).catch(() => {});
+  }, [colorScheme]);
+
+  const toggleTheme = useCallback(() => {
+    setColorScheme(computedScheme === 'dark' ? 'light' : 'dark');
+  }, [computedScheme, setColorScheme]);
 
   const ops: Ops = useMemo(
     () => ({
@@ -254,206 +276,224 @@ export default function App() {
   }, [resourceItems]);
 
   return (
-    <ConfigProvider
-      locale={zhCN}
-      theme={{
-        algorithm: theme.darkAlgorithm,
-        token: {
-          colorPrimary: '#3b82f6',
-          borderRadius: 6,
-          fontFamily:
-            "-apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif",
-        },
-        components: {
-          Select: { optionSelectedBg: '#1e3a5f' },
-        },
-      }}
-    >
-      <div className="app">
-        <Modal
-          title="上传设置"
-          open={settingsOpen}
-          onOk={saveSettingsModal}
-          onCancel={() => setSettingsOpen(false)}
-          okText="保存"
-          cancelText="取消"
-          destroyOnHidden
-        >
-          <div className="settings-form">
-            <label className="settings-label">上传方式</label>
-            <Select
-              className="settings-field"
-              value={provider}
-              onChange={(v) => setProvider(v)}
-              options={[
-                { value: 'api', label: '自定义 API（POST 文件，取响应里的 URL）' },
-                { value: 'auto', label: '自动（本地应用数据目录）' },
-              ]}
-            />
-            {provider === 'api' && (
-              <>
-                <label className="settings-label">API 地址</label>
-                <Input
-                  className="settings-field"
-                  placeholder="https://example.com/upload"
-                  value={apiUrl}
-                  onChange={(e) => setApiUrl(e.target.value)}
-                />
-                <label className="settings-label">Token（可选，Bearer）</label>
-                <Input.Password
-                  className="settings-field"
-                  placeholder={
-                    uploadCfg?.settings.upload.api.hasToken ? '已保存，留空不修改' : '未设置'
-                  }
-                  value={apiToken}
-                  onChange={(e) => {
-                    setApiToken(e.target.value);
-                    setTokenEdited(true);
-                  }}
-                />
-                <label className="settings-label">文件字段名</label>
-                <Input
-                  className="settings-field"
-                  value={apiFileField}
-                  onChange={(e) => setApiFileField(e.target.value)}
-                />
-                <label className="settings-label">响应 URL 字段（支持 data.url 嵌套路径）</label>
-                <Input
-                  className="settings-field"
-                  value={apiUrlField}
-                  onChange={(e) => setApiUrlField(e.target.value)}
-                />
-              </>
-            )}
-          </div>
-        </Modal>
-        <header className="toolbar">
-          <Typography.Title level={4} className="app-title">
-            JSON 可视化编辑器
-          </Typography.Title>
-          <Space size="small" wrap>
-            <Button icon={<ImportOutlined />} onClick={() => jsonFileRef.current?.click()}>
-              导入 JSON
+    <div className="app">
+      <Modal
+        title="上传设置"
+        opened={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        centered
+      >
+        <Stack gap="sm" className="settings-form">
+          <Select
+            label="上传方式"
+            value={provider}
+            onChange={(v) => setProvider(v === 'api' ? 'api' : 'auto')}
+            allowDeselect={false}
+            data={[
+              { value: 'api', label: '自定义 API（POST 文件，取响应里的 URL）' },
+              { value: 'auto', label: '自动（本地应用数据目录）' },
+            ]}
+          />
+          {provider === 'api' && (
+            <>
+              <TextInput
+                label="API 地址"
+                placeholder="https://example.com/upload"
+                value={apiUrl}
+                onChange={(e) => setApiUrl(e.target.value)}
+              />
+              <PasswordInput
+                label="Token（可选，Bearer）"
+                placeholder={
+                  uploadCfg?.settings.upload.api.hasToken ? '已保存，留空不修改' : '未设置'
+                }
+                value={apiToken}
+                onChange={(e) => {
+                  setApiToken(e.target.value);
+                  setTokenEdited(true);
+                }}
+              />
+              <TextInput
+                label="文件字段名"
+                value={apiFileField}
+                onChange={(e) => setApiFileField(e.target.value)}
+              />
+              <TextInput
+                label="响应 URL 字段（支持 data.url 嵌套路径）"
+                value={apiUrlField}
+                onChange={(e) => setApiUrlField(e.target.value)}
+              />
+            </>
+          )}
+          <Group justify="flex-end" mt="xs">
+            <Button variant="default" onClick={() => setSettingsOpen(false)}>
+              取消
             </Button>
-            <Button icon={<FileTextOutlined />} onClick={() => schemaFileRef.current?.click()}>
-              导入注释 Schema
-            </Button>
-            <Button
-              icon={<DownloadOutlined />}
-              onClick={() => download('data.json', JSON.stringify(data, null, 2))}
-            >
-              导出 JSON
-            </Button>
-            <Button
-              icon={<DownloadOutlined />}
-              onClick={() => download('data.schema.json', JSON.stringify(schema, null, 2))}
-            >
-              导出 Schema
-            </Button>
-            <Button
-              icon={<CopyOutlined />}
-              onClick={() => navigator.clipboard.writeText(JSON.stringify(data, null, 2))}
-            >
-              复制 JSON
-            </Button>
-            <Button
-              danger
-              icon={<ClearOutlined />}
-              onClick={() => {
-                setData({});
-                setSchema({});
-              }}
-            >
-              清空
-            </Button>
-          </Space>
-          <Tag icon={<UploadOutlined />} color="blue" className="provider-tag">
-            上传 → {uploadCfg?.label ?? '…'}
-          </Tag>
+            <Button onClick={saveSettingsModal}>保存</Button>
+          </Group>
+        </Stack>
+      </Modal>
+      <header className="toolbar">
+        <Title order={4} className="app-title">
+          JSON 可视化编辑器
+        </Title>
+        <Group gap="xs" wrap="wrap">
           <Button
-            type="text"
-            icon={<SettingOutlined />}
-            title="上传设置"
-            loading={cfgLoading}
-            disabled={!uploadCfg}
-            onClick={openSettings}
-          />
-          <input
-            ref={jsonFileRef}
-            type="file"
-            accept=".json,application/json"
-            hidden
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) importJson(f);
-              e.target.value = '';
+            size="sm"
+            variant="default"
+            leftSection={<IconFileImport size={15} />}
+            onClick={() => jsonFileRef.current?.click()}
+          >
+            导入 JSON
+          </Button>
+          <Button
+            size="sm"
+            variant="default"
+            leftSection={<IconSchema size={15} />}
+            onClick={() => schemaFileRef.current?.click()}
+          >
+            导入注释 Schema
+          </Button>
+          <Button
+            size="sm"
+            variant="default"
+            leftSection={<IconDownload size={15} />}
+            onClick={() => download('data.json', JSON.stringify(data, null, 2))}
+          >
+            导出 JSON
+          </Button>
+          <Button
+            size="sm"
+            variant="default"
+            leftSection={<IconDownload size={15} />}
+            onClick={() => download('data.schema.json', JSON.stringify(schema, null, 2))}
+          >
+            导出 Schema
+          </Button>
+          <Button
+            size="sm"
+            variant="default"
+            leftSection={<IconCopy size={15} />}
+            onClick={() => navigator.clipboard.writeText(JSON.stringify(data, null, 2))}
+          >
+            复制 JSON
+          </Button>
+          <Button
+            size="sm"
+            variant="light"
+            color="red"
+            leftSection={<IconEraser size={15} />}
+            onClick={() => {
+              setData({});
+              setSchema({});
             }}
-          />
-          <input
-            ref={schemaFileRef}
-            type="file"
-            accept=".json,application/json"
-            hidden
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) importSchema(f);
-              e.target.value = '';
-            }}
-          />
-        </header>
+          >
+            清空
+          </Button>
+        </Group>
+        <Badge
+          variant="light"
+          color="lime"
+          leftSection={<IconUpload size={12} />}
+          className="provider-tag"
+        >
+          上传 → {uploadCfg?.label ?? '…'}
+        </Badge>
+        <ActionIcon
+          variant="subtle"
+          size="lg"
+          title={computedScheme === 'dark' ? '切换到浅色主题' : '切换到深色主题'}
+          onClick={toggleTheme}
+        >
+          {computedScheme === 'dark' ? <IconSun size={18} /> : <IconMoon size={18} />}
+        </ActionIcon>
+        <ActionIcon
+          variant="subtle"
+          size="lg"
+          title="上传设置"
+          loading={cfgLoading}
+          disabled={!uploadCfg}
+          onClick={openSettings}
+        >
+          <IconSettings size={18} />
+        </ActionIcon>
+        <input
+          ref={jsonFileRef}
+          type="file"
+          accept=".json,application/json"
+          hidden
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) importJson(f);
+            e.target.value = '';
+          }}
+        />
+        <input
+          ref={schemaFileRef}
+          type="file"
+          accept=".json,application/json"
+          hidden
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) importSchema(f);
+            e.target.value = '';
+          }}
+        />
+      </header>
 
-        {error && (
-          <Alert
-            type="error"
-            message={error}
-            closable
-            onClose={() => setError(null)}
-            className="error-banner"
-          />
-        )}
+      {error && (
+        <Alert
+          color="red"
+          withCloseButton
+          onClose={() => setError(null)}
+          className="error-banner"
+        >
+          {error}
+        </Alert>
+      )}
 
-        <main className="panes">
-          <section className="tree-pane">
-            {resourceItems ? (
-              <>
-                <ResourceList
-                  items={resourceItems}
-                  itemSchema={schemaForPath(schema, ['resource'])?.item}
-                  path={['resource']}
+      <main className="panes">
+        <section className="tree-pane">
+          {resourceItems ? (
+            <>
+              <ResourceList
+                items={resourceItems}
+                itemSchema={schemaForPath(schema, ['resource'])?.item}
+                path={['resource']}
+                ops={ops}
+                onAdd={addResource}
+              />
+              {otherKeys.map((k) => (
+                <TreeNode
+                  key={k}
+                  name={k}
+                  value={(data as Record<string, JsonValue>)[k]}
+                  schema={schema.children?.[k]}
+                  path={[k]}
+                  depth={0}
                   ops={ops}
-                  onAdd={addResource}
+                  onRename={(n) => ops.renameKey([], k, n)}
+                  onDelete={() => ops.deleteNode([k])}
                 />
-                {otherKeys.map((k) => (
-                  <TreeNode
-                    key={k}
-                    name={k}
-                    value={(data as Record<string, JsonValue>)[k]}
-                    schema={schema.children?.[k]}
-                    path={[k]}
-                    depth={0}
-                    ops={ops}
-                    onRename={(n) => ops.renameKey([], k, n)}
-                    onDelete={() => ops.deleteNode([k])}
-                  />
-                ))}
-              </>
-            ) : (
-              <TreeNode value={data} schema={schema} path={[]} depth={0} ops={ops} />
-            )}
-          </section>
-          <section className="preview-pane">
-            <Segmented
-              value={previewTab}
-              onChange={(v) => setPreviewTab(v as 'json' | 'schema')}
-              options={[
-                { value: 'json', label: 'JSON' },
-                { value: 'schema', label: 'Schema（类型 + 注释）' },
-              ]}
-            />
-            <pre className="preview">{JSON.stringify(preview, null, 2)}</pre>
-          </section>
-        </main>
-      </div>
-    </ConfigProvider>
+              ))}
+            </>
+          ) : (
+            <TreeNode value={data} schema={schema} path={[]} depth={0} ops={ops} />
+          )}
+        </section>
+        <section className="preview-pane">
+          <SegmentedControl
+            size="xs"
+            value={previewTab}
+            onChange={(v) => setPreviewTab(v as 'json' | 'schema')}
+            data={[
+              { value: 'json', label: 'JSON' },
+              { value: 'schema', label: 'Schema（类型 + 注释）' },
+            ]}
+          />
+          <pre className="preview">{JSON.stringify(preview, null, 2)}</pre>
+        </section>
+      </main>
+    </div>
   );
 }

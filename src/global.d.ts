@@ -12,6 +12,7 @@ declare global {
         mimeType: string;
         data: ArrayBuffer;
       }): Promise<string>;
+      setTheme(mode: 'light' | 'dark' | 'system'): Promise<void>;
     };
   }
 }
