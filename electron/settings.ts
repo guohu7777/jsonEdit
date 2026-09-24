@@ -83,10 +83,13 @@ function normalizeQuery(raw: unknown): Record<string, string> {
 function normalize(raw: unknown): Settings {
   const upload = asRecord(asRecord(raw).upload);
   const api = asRecord(upload.api);
+  // Legacy provider 'auto' meant local uploads even with a saved API URL; dropping the
+  // field must not silently reactivate that endpoint.
+  const legacyAuto = upload.provider === 'auto';
   return {
     upload: {
       api: {
-        url: asString(api.url, DEFAULTS.upload.api.url),
+        url: legacyAuto ? '' : asString(api.url, DEFAULTS.upload.api.url),
         token: asString(api.token, ''),
         fileField: asString(api.fileField, 'file') || 'file',
         urlField: asString(api.urlField, 'url') || 'url',
