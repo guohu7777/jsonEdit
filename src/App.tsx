@@ -112,7 +112,7 @@ function mergeSchema(value: JsonValue, old: SchemaNode | undefined): SchemaNode 
 
 export default function App() {
   const restored = useMemo(loadWorkspace, []);
-  const [data, setData] = useState<JsonValue>(() => restored?.data ?? SAMPLE);
+  const [data, setData] = useState<JsonValue>(() => (restored ? restored.data : SAMPLE));
   const [schema, setSchema] = useState<SchemaNode>(() => {
     if (!restored) return inferSchema(SAMPLE);
     return Object.keys(restored.schema).length ? restored.schema : inferSchema(restored.data);
@@ -120,6 +120,7 @@ export default function App() {
   const [uploadCfg, setUploadCfg] = useState<UploadConfig | null>(null);
   const [previewTab, setPreviewTab] = useState<'json' | 'schema'>(restored?.previewTab ?? 'json');
   const [error, setError] = useState<string | null>(null);
+  const [persistFailed, setPersistFailed] = useState(false);
   const [cfgLoading, setCfgLoading] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [apiUrl, setApiUrl] = useState('');
@@ -146,10 +147,16 @@ export default function App() {
     void setTheme(colorScheme === 'auto' ? 'system' : colorScheme).catch(() => {});
   }, [colorScheme]);
 
-  // Restore the last editing session on next launch.
+  // Restore the last editing session on next launch. Debounced during editing;
+  // flushed synchronously on pagehide so a close right after an edit is not lost.
   useEffect(() => {
-    const t = setTimeout(() => saveWorkspace({ data, schema, previewTab }), 300);
-    return () => clearTimeout(t);
+    const save = () => setPersistFailed(!saveWorkspace({ data, schema, previewTab }));
+    const t = setTimeout(save, 300);
+    window.addEventListener('pagehide', save);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener('pagehide', save);
+    };
   }, [data, schema, previewTab]);
 
   const toggleTheme = useCallback(() => {
@@ -451,6 +458,15 @@ export default function App() {
         >
           上传 → {uploadCfg?.label ?? '…'}
         </Badge>
+        {persistFailed && (
+          <Badge
+            variant="light"
+            color="yellow"
+            title="文档过大或存储不可用，本次编辑在重开后不会恢复"
+          >
+            未保存
+          </Badge>
+        )}
         <ActionIcon
           variant="subtle"
           size="lg"

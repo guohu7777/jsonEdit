@@ -16,7 +16,9 @@ export function loadWorkspace(): Workspace | null {
     const parsed = JSON.parse(raw) as Partial<Workspace>;
     if (typeof parsed !== 'object' || parsed === null) return null;
     return {
-      data: parsed.data ?? {},
+      // A JSON document may legitimately have a null root: distinguish absent
+      // from explicit null so it survives a save/restart cycle.
+      data: 'data' in parsed ? (parsed.data as JsonValue) : {},
       schema: parsed.schema ?? {},
       previewTab: parsed.previewTab === 'schema' ? 'schema' : 'json',
     };
@@ -25,10 +27,11 @@ export function loadWorkspace(): Workspace | null {
   }
 }
 
-export function saveWorkspace(ws: Workspace): void {
+export function saveWorkspace(ws: Workspace): boolean {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(ws));
+    return true;
   } catch {
-    // quota exceeded or storage blocked; persistence is best-effort
+    return false; // quota exceeded or storage blocked
   }
 }
