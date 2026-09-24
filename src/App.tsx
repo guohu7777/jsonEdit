@@ -54,6 +54,7 @@ import {
 } from './api';
 import { TreeNode } from './components/TreeNode';
 import { ResourceList } from './components/ResourceList';
+import { loadWorkspace, saveWorkspace } from './workspace';
 
 export interface Ops {
   setValue(path: Path, value: JsonValue): void;
@@ -110,10 +111,14 @@ function mergeSchema(value: JsonValue, old: SchemaNode | undefined): SchemaNode 
 }
 
 export default function App() {
-  const [data, setData] = useState<JsonValue>(SAMPLE);
-  const [schema, setSchema] = useState<SchemaNode>(() => inferSchema(SAMPLE));
+  const restored = useMemo(loadWorkspace, []);
+  const [data, setData] = useState<JsonValue>(() => restored?.data ?? SAMPLE);
+  const [schema, setSchema] = useState<SchemaNode>(() => {
+    if (!restored) return inferSchema(SAMPLE);
+    return Object.keys(restored.schema).length ? restored.schema : inferSchema(restored.data);
+  });
   const [uploadCfg, setUploadCfg] = useState<UploadConfig | null>(null);
-  const [previewTab, setPreviewTab] = useState<'json' | 'schema'>('json');
+  const [previewTab, setPreviewTab] = useState<'json' | 'schema'>(restored?.previewTab ?? 'json');
   const [error, setError] = useState<string | null>(null);
   const [cfgLoading, setCfgLoading] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -140,6 +145,12 @@ export default function App() {
   useEffect(() => {
     void setTheme(colorScheme === 'auto' ? 'system' : colorScheme).catch(() => {});
   }, [colorScheme]);
+
+  // Restore the last editing session on next launch.
+  useEffect(() => {
+    const t = setTimeout(() => saveWorkspace({ data, schema, previewTab }), 300);
+    return () => clearTimeout(t);
+  }, [data, schema, previewTab]);
 
   const toggleTheme = useCallback(() => {
     setColorScheme(computedScheme === 'dark' ? 'light' : 'dark');
