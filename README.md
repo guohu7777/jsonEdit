@@ -29,6 +29,24 @@ npm run typecheck  # tsc -b --noEmit
 
 > 需要 Node.js ≥ 20。
 
+## 安装
+
+在 [Releases](https://github.com/guohu7777/jsonEdit/releases) 下载对应平台的安装包（Linux AppImage / macOS dmg / Windows nsis）。
+
+### macOS 提示「已损坏」或「无法验证开发者」
+
+macOS 版未做 Apple 签名/公证，Gatekeeper 会拦截首次打开。把 dmg 里的 `JSON Editor.app` 拖入「应用程序」后，任选一种方式放行：
+
+- **命令行**（推荐，一劳永逸）：
+
+  ```bash
+  xattr -cr "/Applications/JSON Editor.app"
+  ```
+
+- **图形界面**：双击应用被拦截后，打开 系统设置 → 隐私与安全性 → 安全性，找到被拦截的「JSON Editor」点「仍要打开」，再输密码确认。
+
+放行一次后，之后正常双击即可。若以后要改为正式签名+公证，需在 CI 配置 `CSC_LINK` / `CSC_KEY_PASSWORD` / `APPLE_API_*` 等 Secrets（见 `.github/workflows/build.yml` 中的注释）。
+
 ## 上传配置
 
 上传目标按优先级生效：**自定义 API（界面配置）→ 本地存储（回退）**。工具栏右上角显示当前生效的上传目标。
