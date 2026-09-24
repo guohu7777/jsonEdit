@@ -3,8 +3,12 @@ name: Build
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -27,9 +31,10 @@ jobs:
       - run: npx electron-vite build
 
       # electron-builder picks the target for the host OS
-      # (win→nsis, mac→dmg, linux→AppImage). --publish never skips any release upload.
+      # (win→nsis, mac→dmg, linux→AppImage). Tag pushes (v*) publish a draft
+      # GitHub Release with all three OS artifacts; other builds only upload artifacts.
       - name: electron-builder
-        run: npx electron-builder --publish never
+        run: npx electron-builder --publish ${{ startsWith(github.ref, 'refs/tags/') && 'always' || 'never' }}
         env:
           # unsigned mac builds; set CSC_* secrets later for proper signing
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
